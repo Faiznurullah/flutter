@@ -5,12 +5,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as path;
+
+import 'constants.dart';
 
 /// The location of the Flutter root directory, based on the known location of
 /// this script.
 final Directory flutterRoot = Directory(path.dirname(Platform.script.toFilePath())).parent.parent.parent.parent;
-final String dataRoot = path.join(flutterRoot.path, 'dev', 'tools', 'gen_keycodes', 'data');
+String get dataRoot => testDataRoot ?? _dataRoot;
+String _dataRoot = path.join(flutterRoot.path, 'dev', 'tools', 'gen_keycodes', 'data');
+
+/// Allows overriding of the [dataRoot] for testing purposes.
+@visibleForTesting
+String? testDataRoot;
 
 /// Converts `FOO_BAR` to `FooBar`.
 String shoutingToUpperCamel(String shouting) {
@@ -145,8 +153,9 @@ String wrapString(String input, {required String prefix}) {
 ///
 /// An null list is considered a list with length 0.
 void zipStrict<T1, T2>(Iterable<T1> list1, Iterable<T2> list2, void Function(T1, T2) fn) {
-  if (list1 == null && list2 == null)
+  if (list1 == null && list2 == null) {
     return;
+  }
   assert(list1.length == list2.length);
   final Iterator<T1> it1 = list1.iterator;
   final Iterator<T2> it2 = list2.iterator;
@@ -176,6 +185,10 @@ Map<String, List<String?>> parseMapOfListOfNullableString(String jsonString) {
   });
 }
 
+Map<String, bool> parseMapOfBool(String jsonString) {
+  return (json.decode(jsonString) as Map<String, dynamic>).cast<String, bool>();
+}
+
 /// Reverse the map of { fromValue -> list of toValue } to { toValue -> fromValue } and return.
 Map<String, String> reverseMapOfListOfString(Map<String, List<String>> inMap, void Function(String fromValue, String newToValue) onDuplicate) {
   final Map<String, String> result = <String, String>{};
@@ -196,8 +209,9 @@ Map<String, String> reverseMapOfListOfString(Map<String, List<String>> inMap, vo
 /// Will modify the input map.
 Map<String, dynamic> removeEmptyValues(Map<String, dynamic> map) {
   return map..removeWhere((String key, dynamic value) {
-    if (value == null)
+    if (value == null) {
       return true;
+    }
     if (value is Map<String, dynamic>) {
       final Map<String, dynamic> regularizedMap = removeEmptyValues(value);
       return regularizedMap.isEmpty;
@@ -221,32 +235,77 @@ void addNameValue(List<String> names, List<int> values, String name, int value) 
   }
 }
 
+enum DeduplicateBehavior {
+  // Warn the duplicate entry.
+  kWarn,
+
+  // Skip the latter duplicate entry.
+  kSkip,
+
+  // Keep all duplicate entries.
+  kKeep,
+}
+
+/// The information for a line used by [OutputLines].
+class OutputLine<T extends Comparable<Object>> {
+  OutputLine(this.key, String value)
+    : values = <String>[value];
+
+  final T key;
+  final List<String> values;
+}
+
 /// A utility class to build join a number of lines in a sorted order.
 ///
 /// Use [add] to add a line and associate it with an index. Use [sortedJoin] to
 /// get the joined string of these lines joined sorting them in the order of the
 /// index.
 class OutputLines<T extends Comparable<Object>> {
-  OutputLines(this.mapName);
+  OutputLines(this.mapName, {this.behavior = DeduplicateBehavior.kWarn});
+
+  /// What to do if there are entries with the same key.
+  final DeduplicateBehavior behavior;
 
   /// The name for this map.
   ///
   /// Used in warning messages.
   final String mapName;
 
-  final Map<T, String> lines = <T, String>{};
+  final Map<T, OutputLine<T>> lines = <T, OutputLine<T>>{};
 
-  void add(T code, String line) {
-    if (lines.containsKey(code)) {
-      print('Warn: $mapName is requested to add line $code as:\n    $line\n  but it already exists as:\n    ${lines[code]}');
+  void add(T key, String line) {
+    final OutputLine<T>? existing = lines[key];
+    if (existing != null) {
+      switch (behavior) {
+        case DeduplicateBehavior.kWarn:
+          print('Warn: Request to add $key to map "$mapName" as:\n    $line\n  but it already exists as:\n    ${existing.values[0]}');
+          return;
+        case DeduplicateBehavior.kSkip:
+          return;
+        case DeduplicateBehavior.kKeep:
+          existing.values.add(line);
+          return;
+      }
     }
-    lines[code] = line;
+    lines[key] = OutputLine<T>(key, line);
+  }
+
+  String join() {
+    return lines.values.map((OutputLine<T> line) => line.values.join('\n')).join('\n');
   }
 
   String sortedJoin() {
-    return (lines.entries.toList()
-      ..sort((MapEntry<T, String> a, MapEntry<T, String> b) => a.key.compareTo(b.key)))
-      .map((MapEntry<T, String> entry) => entry.value)
+    return (lines.values.toList()
+      ..sort((OutputLine<T> a, OutputLine<T> b) => a.key.compareTo(b.key)))
+      .map((OutputLine<T> line) => line.values.join('\n'))
       .join('\n');
   }
+}
+
+int toPlane(int value, int plane) {
+  return (value & kValueMask.value) + (plane & kPlaneMask.value);
+}
+
+int getPlane(int value) {
+  return value & kPlaneMask.value;
 }

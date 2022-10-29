@@ -5,6 +5,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'adaptive_text_selection_toolbar.dart';
 import 'colors.dart';
 import 'form_row.dart';
 import 'text_field.dart';
@@ -42,7 +43,7 @@ import 'text_field.dart';
 /// resources used by the object.
 ///
 /// For documentation about the various parameters, see the
-/// [CupertinoTextField] class and [new CupertinoTextField.borderless],
+/// [CupertinoTextField] class and [CupertinoTextField.borderless],
 /// the constructor.
 ///
 /// {@tool snippet}
@@ -70,44 +71,11 @@ import 'text_field.dart';
 /// ```
 /// {@end-tool}
 ///
-/// {@tool dartpad --template=stateful_widget_material}
+/// {@tool dartpad}
 /// This example shows how to move the focus to the next field when the user
 /// presses the SPACE key.
 ///
-/// ```dart imports
-/// import 'package:flutter/cupertino.dart';
-/// ```
-///
-/// ```dart
-/// @override
-/// Widget build(BuildContext context) {
-///   return CupertinoPageScaffold(
-///     child: Center(
-///       child: Form(
-///         autovalidateMode: AutovalidateMode.always,
-///         onChanged: () {
-///           Form.of(primaryFocus!.context!)?.save();
-///         },
-///         child: CupertinoFormSection.insetGrouped(
-///           header: const Text('SECTION 1'),
-///           children: List<Widget>.generate(5, (int index) {
-///             return CupertinoTextFormFieldRow(
-///               prefix: const Text('Enter text'),
-///               placeholder: 'Enter text',
-///               validator: (String? value) {
-///                 if (value == null || value.isEmpty) {
-///                   return 'Please enter a value';
-///                 }
-///                 return null;
-///               },
-///             );
-///          }),
-///         ),
-///       ),
-///     ),
-///   );
-/// }
-/// ```
+/// ** See code in examples/api/lib/cupertino/text_form_field_row/cupertino_text_form_field_row.1.dart **
 /// {@end-tool}
 class CupertinoTextFormFieldRow extends FormField<String> {
   /// Creates a [CupertinoFormRow] containing a [FormField] that wraps
@@ -129,10 +97,10 @@ class CupertinoTextFormFieldRow extends FormField<String> {
   /// insets are intended, explicitly pass [EdgeInsets.zero] to [padding].
   ///
   /// For documentation about the various parameters, see the
-  /// [CupertinoTextField] class and [new CupertinoTextField.borderless],
+  /// [CupertinoTextField] class and [CupertinoTextField.borderless],
   /// the constructor.
   CupertinoTextFormFieldRow({
-    Key? key,
+    super.key,
     this.prefix,
     this.padding,
     this.controller,
@@ -144,10 +112,15 @@ class CupertinoTextFormFieldRow extends FormField<String> {
     TextInputAction? textInputAction,
     TextStyle? style,
     StrutStyle? strutStyle,
+    TextDirection? textDirection,
     TextAlign textAlign = TextAlign.start,
     TextAlignVertical? textAlignVertical,
     bool autofocus = false,
     bool readOnly = false,
+    @Deprecated(
+      'Use `contextMenuBuilder` instead. '
+      'This feature was deprecated after v3.3.0-0.5.pre.',
+    )
     ToolbarOptions? toolbarOptions,
     bool? showCursor,
     String obscuringCharacter = '•',
@@ -164,8 +137,8 @@ class CupertinoTextFormFieldRow extends FormField<String> {
     GestureTapCallback? onTap,
     VoidCallback? onEditingComplete,
     ValueChanged<String>? onFieldSubmitted,
-    FormFieldSetter<String>? onSaved,
-    FormFieldValidator<String>? validator,
+    super.onSaved,
+    super.validator,
     List<TextInputFormatter>? inputFormatters,
     bool? enabled,
     double cursorWidth = 2.0,
@@ -177,12 +150,13 @@ class CupertinoTextFormFieldRow extends FormField<String> {
     TextSelectionControls? selectionControls,
     ScrollPhysics? scrollPhysics,
     Iterable<String>? autofillHints,
-    AutovalidateMode autovalidateMode = AutovalidateMode.disabled,
+    AutovalidateMode super.autovalidateMode = AutovalidateMode.disabled,
     String? placeholder,
     TextStyle? placeholderStyle = const TextStyle(
       fontWeight: FontWeight.w400,
       color: CupertinoColors.placeholderText,
     ),
+    EditableTextContextMenuBuilder? contextMenuBuilder = _defaultContextMenuBuilder,
   })  : assert(initialValue == null || controller == null),
         assert(textAlign != null),
         assert(autofocus != null),
@@ -207,11 +181,7 @@ class CupertinoTextFormFieldRow extends FormField<String> {
         assert(maxLength == null || maxLength > 0),
         assert(enableInteractiveSelection != null),
         super(
-          key: key,
           initialValue: controller?.text ?? initialValue ?? '',
-          onSaved: onSaved,
-          validator: validator,
-          autovalidateMode: autovalidateMode,
           builder: (FormFieldState<String> field) {
             final _CupertinoTextFormFieldRowState state =
                 field as _CupertinoTextFormFieldRowState;
@@ -238,6 +208,7 @@ class CupertinoTextFormFieldRow extends FormField<String> {
                 textAlign: textAlign,
                 textAlignVertical: textAlignVertical,
                 textCapitalization: textCapitalization,
+                textDirection: textDirection,
                 autofocus: autofocus,
                 toolbarOptions: toolbarOptions,
                 readOnly: readOnly,
@@ -269,6 +240,7 @@ class CupertinoTextFormFieldRow extends FormField<String> {
                 autofillHints: autofillHints,
                 placeholder: placeholder,
                 placeholderStyle: placeholderStyle,
+                contextMenuBuilder: contextMenuBuilder,
               ),
             );
           },
@@ -297,6 +269,12 @@ class CupertinoTextFormFieldRow extends FormField<String> {
   /// initialize its [TextEditingController.text] with [initialValue].
   final TextEditingController? controller;
 
+  static Widget _defaultContextMenuBuilder(BuildContext context, EditableTextState editableTextState) {
+    return CupertinoAdaptiveTextSelectionToolbar.editableText(
+      editableTextState: editableTextState,
+    );
+  }
+
   @override
   FormFieldState<String> createState() => _CupertinoTextFormFieldRowState();
 }
@@ -305,36 +283,35 @@ class _CupertinoTextFormFieldRowState extends FormFieldState<String> {
   TextEditingController? _controller;
 
   TextEditingController? get _effectiveController =>
-      widget.controller ?? _controller;
+      _cupertinoTextFormFieldRow.controller ?? _controller;
 
-  @override
-  CupertinoTextFormFieldRow get widget =>
+  CupertinoTextFormFieldRow get _cupertinoTextFormFieldRow =>
       super.widget as CupertinoTextFormFieldRow;
 
   @override
   void initState() {
     super.initState();
-    if (widget.controller == null) {
+    if (_cupertinoTextFormFieldRow.controller == null) {
       _controller = TextEditingController(text: widget.initialValue);
     } else {
-      widget.controller!.addListener(_handleControllerChanged);
+      _cupertinoTextFormFieldRow.controller!.addListener(_handleControllerChanged);
     }
   }
 
   @override
   void didUpdateWidget(CupertinoTextFormFieldRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
+    if (_cupertinoTextFormFieldRow.controller != oldWidget.controller) {
       oldWidget.controller?.removeListener(_handleControllerChanged);
-      widget.controller?.addListener(_handleControllerChanged);
+      _cupertinoTextFormFieldRow.controller?.addListener(_handleControllerChanged);
 
-      if (oldWidget.controller != null && widget.controller == null) {
+      if (oldWidget.controller != null && _cupertinoTextFormFieldRow.controller == null) {
         _controller =
             TextEditingController.fromValue(oldWidget.controller!.value);
       }
 
-      if (widget.controller != null) {
-        setValue(widget.controller!.text);
+      if (_cupertinoTextFormFieldRow.controller != null) {
+        setValue(_cupertinoTextFormFieldRow.controller!.text);
         if (oldWidget.controller == null) {
           _controller = null;
         }
@@ -344,7 +321,7 @@ class _CupertinoTextFormFieldRowState extends FormFieldState<String> {
 
   @override
   void dispose() {
-    widget.controller?.removeListener(_handleControllerChanged);
+    _cupertinoTextFormFieldRow.controller?.removeListener(_handleControllerChanged);
     super.dispose();
   }
 

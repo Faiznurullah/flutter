@@ -11,19 +11,18 @@ import 'package:flutter_tools/src/convert.dart';
 import 'package:flutter_tools/src/doctor_validator.dart';
 import 'package:flutter_tools/src/intellij/intellij_validator.dart';
 import 'package:flutter_tools/src/ios/plist_parser.dart';
-import 'package:test/fake.dart';
 
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
+import '../../src/fakes.dart';
 
 final Platform macPlatform = FakePlatform(
   operatingSystem: 'macos',
   environment: <String, String>{'HOME': '/foo/bar'}
 );
 final Platform linuxPlatform = FakePlatform(
-  operatingSystem: 'linux',
   environment: <String, String>{
-    'HOME': '/foo/bar'
+    'HOME': '/foo/bar',
   },
 );
 final Platform windowsPlatform = FakePlatform(
@@ -31,7 +30,7 @@ final Platform windowsPlatform = FakePlatform(
   environment: <String, String>{
     'USERPROFILE': r'C:\Users\foo',
     'APPDATA': r'C:\Users\foo\AppData\Roaming',
-    'LOCALAPPDATA': r'C:\Users\foo\AppData\Local'
+    'LOCALAPPDATA': r'C:\Users\foo\AppData\Local',
   },
 );
 
@@ -50,7 +49,7 @@ void main() {
       ValidationMessage.error('Flutter plugin version 0.1.3 - the recommended minimum version is 16.0.0'),
       ValidationMessage('Dart plugin version 162.2485'),
       ValidationMessage('For information about installing plugins, see\n'
-          'https://flutter.dev/intellij-setup/#installing-the-plugins')
+          'https://flutter.dev/intellij-setup/#installing-the-plugins'),
     ]);
   });
 
@@ -68,8 +67,8 @@ void main() {
     final Directory installedDirectory = fileSystem.directory(installPath);
     installedDirectory.createSync(recursive: true);
     // Create plugin JAR file for Flutter and Dart plugin.
-    createIntellijFlutterPluginJar(pluginPath + '/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
-    createIntellijDartPluginJar(pluginPath + '/Dart/lib/Dart.jar', fileSystem);
+    createIntellijFlutterPluginJar('$pluginPath/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
+    createIntellijDartPluginJar('$pluginPath/Dart/lib/Dart.jar', fileSystem);
 
     final Iterable<DoctorValidator> installed = IntelliJValidatorOnLinux.installed(
       fileSystem: fileSystem,
@@ -95,8 +94,8 @@ void main() {
     final Directory installedDirectory = fileSystem.directory(installPath);
     installedDirectory.createSync(recursive: true);
     // Create plugin JAR file for Flutter and Dart plugin.
-    createIntellijFlutterPluginJar(pluginPath + '/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
-    createIntellijDartPluginJar(pluginPath + '/Dart/lib/Dart.jar', fileSystem);
+    createIntellijFlutterPluginJar('$pluginPath/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
+    createIntellijDartPluginJar('$pluginPath/Dart/lib/Dart.jar', fileSystem);
 
     final Iterable<DoctorValidator> installed = IntelliJValidatorOnLinux.installed(
       fileSystem: fileSystem,
@@ -122,8 +121,8 @@ void main() {
     final Directory installedDirectory = fileSystem.directory(installPath);
     installedDirectory.createSync(recursive: true);
     // Create plugin JAR file for Flutter and Dart plugin.
-    createIntellijFlutterPluginJar(pluginPath + '/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
-    createIntellijDartPluginJar(pluginPath + '/Dart/lib/Dart.jar', fileSystem);
+    createIntellijFlutterPluginJar('$pluginPath/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
+    createIntellijDartPluginJar('$pluginPath/Dart/lib/Dart.jar', fileSystem);
 
     final Iterable<DoctorValidator> installed = IntelliJValidatorOnLinux.installed(
       fileSystem: fileSystem,
@@ -149,8 +148,8 @@ void main() {
     final Directory installedDirectory = fileSystem.directory(installPath);
     installedDirectory.createSync(recursive: true);
     // Create plugin JAR file for Flutter and Dart plugin.
-    createIntellijFlutterPluginJar(pluginPath + '/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
-    createIntellijDartPluginJar(pluginPath + '/Dart/lib/Dart.jar', fileSystem);
+    createIntellijFlutterPluginJar('$pluginPath/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
+    createIntellijDartPluginJar('$pluginPath/Dart/lib/Dart.jar', fileSystem);
 
     final Iterable<DoctorValidator> installed = IntelliJValidatorOnLinux.installed(
       fileSystem: fileSystem,
@@ -175,8 +174,8 @@ void main() {
         .writeAsStringSync(installPath, flush: true);
     final Directory installedDirectory = fileSystem.directory(installPath);
     installedDirectory.createSync(recursive: true);
-    createIntellijFlutterPluginJar(pluginPath + '/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
-    createIntellijDartPluginJar(pluginPath + '/Dart/lib/Dart.jar', fileSystem);
+    createIntellijFlutterPluginJar('$pluginPath/flutter-intellij/lib/flutter-intellij.jar', fileSystem, version: '50.0');
+    createIntellijDartPluginJar('$pluginPath/Dart/lib/Dart.jar', fileSystem);
 
     final Iterable<DoctorValidator> installed = IntelliJValidatorOnWindows.installed(
       fileSystem: fileSystem,
@@ -314,9 +313,9 @@ void main() {
     expect(ce.title, 'IntelliJ IDEA Community Edition');
     expect(ce.installPath, ceRandomLocation);
 
-    final IntelliJValidatorOnMac utlimate = validators.where((IntelliJValidatorOnMac validator) => validator.id == 'IntelliJIdea').single;
-    expect(utlimate.title, 'IntelliJ IDEA Ultimate Edition');
-    expect(utlimate.installPath, ultimateRandomLocation);
+    final IntelliJValidatorOnMac ultimate = validators.where((IntelliJValidatorOnMac validator) => validator.id == 'IntelliJIdea').single;
+    expect(ultimate.title, 'IntelliJ IDEA Ultimate Edition');
+    expect(ultimate.installPath, ultimateRandomLocation);
   });
 
   testWithoutContext('Intellij plugins path checking on mac', () async {
@@ -374,20 +373,9 @@ void main() {
   });
 }
 
-class FakePlistParser extends Fake implements PlistParser {
-  FakePlistParser(this.values);
-
-  final Map<String, String> values;
-
-  @override
-  String? getValueFromFile(String plistFilePath, String key) {
-    return values[key];
-  }
-}
-
 class IntelliJValidatorTestTarget extends IntelliJValidator {
-  IntelliJValidatorTestTarget(String title, String installPath,  FileSystem fileSystem)
-    : super(title, installPath, fileSystem: fileSystem, userMessages: UserMessages());
+  IntelliJValidatorTestTarget(super.title, super.installPath,  FileSystem fileSystem)
+    : super(fileSystem: fileSystem, userMessages: UserMessages());
 
   @override
   String get pluginsPath => 'plugins';

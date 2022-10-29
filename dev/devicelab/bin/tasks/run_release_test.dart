@@ -6,8 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_devicelab/common.dart';
-import 'package:flutter_devicelab/framework/adb.dart';
+import 'package:flutter_devicelab/framework/devices.dart';
 import 'package:flutter_devicelab/framework/framework.dart';
 import 'package:flutter_devicelab/framework/task_result.dart';
 import 'package:flutter_devicelab/framework/utils.dart';
@@ -50,7 +49,7 @@ void main() {
         <String>['--suppress-analytics', 'run', '--release', '-d', device.deviceId, 'lib/main.dart'],
         isBot: false, // we just want to test the output, not have any debugging info
       );
-      int runExitCode;
+      int? runExitCode;
       run.stdout
         .transform<String>(utf8.decoder)
         .transform<String>(const LineSplitter())
@@ -76,6 +75,8 @@ void main() {
       run.stderr
         .transform<String>(utf8.decoder)
         .transform<String>(const LineSplitter())
+        // TODO(egarciad): Remove once https://github.com/flutter/flutter/issues/95131 is fixed.
+        .skipWhile((String line) => line.contains('Mapping new ns'))
         .listen((String line) {
           print('run:stderr: $line');
           stderr.add(line);
@@ -113,8 +114,8 @@ void main() {
 
       _findNextMatcherInList(
         stdout,
-        (String line) => line.startsWith('Installing build/app/outputs/flutter-apk/app.apk...'),
-        'Installing build/app/outputs/flutter-apk/app.apk...',
+        (String line) => line.startsWith('Installing build/app/outputs/flutter-apk/app-release.apk...'),
+        'Installing build/app/outputs/flutter-apk/app-release.apk...',
       );
 
       _findNextMatcherInList(

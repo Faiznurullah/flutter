@@ -32,9 +32,9 @@ void main() {
     expect(ShapeBorder.lerp(c10, c20, 0.5), c15);
     expect(ShapeBorder.lerp(c10, c20, 1.0), c20);
 
-    const StadiumBorder c1 = StadiumBorder(side: BorderSide(width: 1.0));
+    const StadiumBorder c1 = StadiumBorder(side: BorderSide());
     expect(c1.getOuterPath(Rect.fromCircle(center: Offset.zero, radius: 1.0)), isUnitCircle);
-    const StadiumBorder c2 = StadiumBorder(side: BorderSide(width: 1.0));
+    const StadiumBorder c2 = StadiumBorder(side: BorderSide());
     expect(c2.getInnerPath(Rect.fromCircle(center: Offset.zero, radius: 2.0)), isUnitCircle);
     const Rect rect = Rect.fromLTRB(10.0, 20.0, 100.0, 200.0);
     expect(
@@ -47,9 +47,36 @@ void main() {
     );
   });
 
+  test('StadiumBorder with StrokeAlign', () {
+    const StadiumBorder center = StadiumBorder(side: BorderSide(width: 10.0, strokeAlign: BorderSide.strokeAlignCenter));
+    const StadiumBorder outside = StadiumBorder(side: BorderSide(width: 10.0, strokeAlign: BorderSide.strokeAlignOutside));
+    expect(center.dimensions, const EdgeInsets.all(5.0));
+    expect(outside.dimensions, EdgeInsets.zero);
+
+    const Rect rect = Rect.fromLTRB(10.0, 20.0, 100.0, 200.0);
+
+    expect(
+      (Canvas canvas) => center.paint(canvas, rect),
+      paints
+        ..rrect(
+          rrect: RRect.fromRectAndRadius(rect, Radius.circular(rect.shortestSide / 2.0)),
+          strokeWidth: 10.0,
+        ),
+    );
+
+    expect(
+      (Canvas canvas) => outside.paint(canvas, rect),
+      paints
+        ..rrect(
+          rrect: RRect.fromRectAndRadius(rect, Radius.circular(rect.shortestSide / 2.0)).inflate(5.0),
+          strokeWidth: 10.0,
+        ),
+    );
+  });
+
   test('StadiumBorder and CircleBorder', () {
-    const StadiumBorder stadium = StadiumBorder(side: BorderSide.none);
-    const CircleBorder circle = CircleBorder(side: BorderSide.none);
+    const StadiumBorder stadium = StadiumBorder();
+    const CircleBorder circle = CircleBorder();
     const Rect rect = Rect.fromLTWH(0.0, 0.0, 100.0, 20.0);
     final Matcher looksLikeS = isPathThat(
       includes: const <Offset>[ Offset(30.0, 10.0), Offset(50.0, 10.0), ],
@@ -76,28 +103,28 @@ void main() {
 
     expect(
       ShapeBorder.lerp(stadium, circle, 0.1).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 10.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 10.0% of the way to being a CircleBorder)',
     );
     expect(
       ShapeBorder.lerp(stadium, circle, 0.2).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 20.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 20.0% of the way to being a CircleBorder)',
     );
     expect(
       ShapeBorder.lerp(ShapeBorder.lerp(stadium, circle, 0.1), ShapeBorder.lerp(stadium, circle, 0.9), 0.9).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 82.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 82.0% of the way to being a CircleBorder)',
     );
 
     expect(
       ShapeBorder.lerp(circle, stadium, 0.9).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 10.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 10.0% of the way to being a CircleBorder)',
     );
     expect(
       ShapeBorder.lerp(circle, stadium, 0.8).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 20.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 20.0% of the way to being a CircleBorder)',
     );
     expect(
       ShapeBorder.lerp(ShapeBorder.lerp(stadium, circle, 0.9), ShapeBorder.lerp(stadium, circle, 0.1), 0.1).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), 82.0% of the way to being a CircleBorder)',
+      'StadiumBorder(BorderSide(width: 0.0, style: none), 82.0% of the way to being a CircleBorder)',
     );
 
     expect(ShapeBorder.lerp(stadium, circle, 0.1), ShapeBorder.lerp(stadium, circle, 0.1));
@@ -111,8 +138,8 @@ void main() {
   });
 
   test('StadiumBorder and RoundedRectBorder', () {
-    const StadiumBorder stadium = StadiumBorder(side: BorderSide.none);
-    const RoundedRectangleBorder rrect = RoundedRectangleBorder(side: BorderSide.none);
+    const StadiumBorder stadium = StadiumBorder();
+    const RoundedRectangleBorder rrect = RoundedRectangleBorder();
     const Rect rect = Rect.fromLTWH(0.0, 0.0, 100.0, 50.0);
     final Matcher looksLikeS = isPathThat(
       includes: const <Offset>[
@@ -155,33 +182,33 @@ void main() {
 
     expect(
       ShapeBorder.lerp(stadium, rrect, 0.1).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 10.0% of the way to being a RoundedRectangleBorder)',
     );
     expect(
       ShapeBorder.lerp(stadium, rrect, 0.2).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 20.0% of the way to being a RoundedRectangleBorder)',
     );
     expect(
       ShapeBorder.lerp(ShapeBorder.lerp(stadium, rrect, 0.1), ShapeBorder.lerp(stadium, rrect, 0.9), 0.9).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 82.0% of the way to being a RoundedRectangleBorder)',
     );
 
     expect(
       ShapeBorder.lerp(rrect, stadium, 0.9).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 10.0% of the way to being a RoundedRectangleBorder)',
     );
     expect(
       ShapeBorder.lerp(rrect, stadium, 0.8).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 20.0% of the way to being a RoundedRectangleBorder)',
     );
     expect(
       ShapeBorder.lerp(ShapeBorder.lerp(stadium, rrect, 0.9), ShapeBorder.lerp(stadium, rrect, 0.1), 0.1).toString(),
-      'StadiumBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), '
+      'StadiumBorder(BorderSide(width: 0.0, style: none), '
       'BorderRadius.zero, 82.0% of the way to being a RoundedRectangleBorder)',
     );
 

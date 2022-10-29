@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
+import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
-import '../base/common.dart';
 import '../base/file_system.dart';
 import '../base/io.dart';
 import '../base/logger.dart';
@@ -18,32 +17,48 @@ import '../base/utils.dart';
 import '../build_info.dart';
 import '../cache.dart';
 import '../flutter_manifest.dart';
-import '../globals_null_migrated.dart' as globals;
+import '../globals.dart' as globals;
 import '../macos/cocoapod_utils.dart';
 import '../macos/xcode.dart';
+import '../migrations/xcode_project_object_version_migration.dart';
+import '../migrations/xcode_script_build_phase_migration.dart';
 import '../project.dart';
 import '../reporting/reporting.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
-import 'devices.dart';
+import 'iproxy.dart';
+import 'migrations/host_app_info_plist_migration.dart';
+import 'migrations/ios_deployment_target_migration.dart';
 import 'migrations/project_base_configuration_migration.dart';
 import 'migrations/project_build_location_migration.dart';
+import 'migrations/remove_bitcode_migration.dart';
 import 'migrations/remove_framework_link_and_embedding_migration.dart';
 import 'migrations/xcode_build_system_migration.dart';
 import 'xcode_build_settings.dart';
 import 'xcodeproj.dart';
+import 'xcresult.dart';
 
 class IMobileDevice {
   IMobileDevice({
-    @required Artifacts artifacts,
-    @required Cache cache,
-    @required ProcessManager processManager,
-    @required Logger logger,
+    required Artifacts artifacts,
+    required Cache cache,
+    required ProcessManager processManager,
+    required Logger logger,
   }) : _idevicesyslogPath = artifacts.getHostArtifact(HostArtifact.idevicesyslog).path,
       _idevicescreenshotPath = artifacts.getHostArtifact(HostArtifact.idevicescreenshot).path,
       _dyLdLibEntry = cache.dyLdLibEntry,
       _processUtils = ProcessUtils(logger: logger, processManager: processManager),
       _processManager = processManager;
+
+  /// Create an [IMobileDevice] for testing.
+  factory IMobileDevice.test({ required ProcessManager processManager }) {
+    return IMobileDevice(
+      artifacts: Artifacts.test(),
+      cache: Cache.test(processManager: processManager),
+      processManager: processManager,
+      logger: BufferLogger.test(),
+    );
+  }
 
   final String _idevicesyslogPath;
   final String _idevicescreenshotPath;
@@ -51,8 +66,7 @@ class IMobileDevice {
   final ProcessManager _processManager;
   final ProcessUtils _processUtils;
 
-  bool get isInstalled => _isInstalled ??= _processManager.canRun(_idevicescreenshotPath);
-  bool _isInstalled;
+  late final bool isInstalled = _processManager.canRun(_idevicescreenshotPath);
 
   /// Starts `idevicesyslog` and returns the running process.
   Future<Process> startLogger(String deviceID) {
@@ -72,7 +86,7 @@ class IMobileDevice {
   Future<void> takeScreenshot(
     File outputFile,
     String deviceID,
-    IOSDeviceInterface interfaceType,
+    IOSDeviceConnectionInterface interfaceType,
   ) {
     return _processUtils.run(
       <String>[
@@ -80,7 +94,7 @@ class IMobileDevice {
         outputFile.path,
         '--udid',
         deviceID,
-        if (interfaceType == IOSDeviceInterface.network)
+        if (interfaceType == IOSDeviceConnectionInterface.network)
           '--network',
       ],
       throwOnError: true,
@@ -92,13 +106,13 @@ class IMobileDevice {
 }
 
 Future<XcodeBuildResult> buildXcodeProject({
-  BuildableIOSApp app,
-  BuildInfo buildInfo,
-  String targetOverride,
-  bool buildForDevice,
-  DarwinArch activeArch,
+  required BuildableIOSApp app,
+  required BuildInfo buildInfo,
+  String? targetOverride,
+  EnvironmentType environmentType = EnvironmentType.physical,
+  DarwinArch? activeArch,
   bool codesign = true,
-  String deviceID,
+  String? deviceID,
   bool configOnly = false,
   XcodeBuildAction buildAction = XcodeBuildAction.build,
 }) async {
@@ -111,12 +125,15 @@ Future<XcodeBuildResult> buildXcodeProject({
     XcodeBuildSystemMigration(app.project, globals.logger),
     ProjectBaseConfigurationMigration(app.project, globals.logger),
     ProjectBuildLocationMigration(app.project, globals.logger),
+    IOSDeploymentTargetMigration(app.project, globals.logger),
+    XcodeProjectObjectVersionMigration(app.project, globals.logger),
+    HostAppInfoPlistMigration(app.project, globals.logger),
+    XcodeScriptBuildPhaseMigration(app.project, globals.logger),
+    RemoveBitcodeMigration(app.project, globals.logger),
   ];
 
   final ProjectMigration migration = ProjectMigration(migrators);
-  if (!migration.run()) {
-    return XcodeBuildResult(success: false);
-  }
+  migration.run();
 
   if (!_checkXcodeVersion()) {
     return XcodeBuildResult(success: false);
@@ -124,12 +141,16 @@ Future<XcodeBuildResult> buildXcodeProject({
 
   await removeFinderExtendedAttributes(app.project.parent.directory, globals.processUtils, globals.logger);
 
-  final XcodeProjectInfo projectInfo = await app.project.projectInfo();
-  final String scheme = projectInfo.schemeFor(buildInfo);
+  final XcodeProjectInfo? projectInfo = await app.project.projectInfo();
+  if (projectInfo == null) {
+    globals.printError('Xcode project not found.');
+    return XcodeBuildResult(success: false);
+  }
+  final String? scheme = projectInfo.schemeFor(buildInfo);
   if (scheme == null) {
     projectInfo.reportFlavorNotFoundAndExit();
   }
-  final String configuration = projectInfo.buildConfigurationFor(buildInfo, scheme);
+  final String? configuration = projectInfo.buildConfigurationFor(buildInfo, scheme);
   if (configuration == null) {
     globals.printError('');
     globals.printError('The Xcode project defines build configurations: ${projectInfo.buildConfigurations.join(', ')}');
@@ -157,14 +178,14 @@ Future<XcodeBuildResult> buildXcodeProject({
   }
 
   final FlutterManifest manifest = app.project.parent.manifest;
-  final String buildName = parsedBuildName(manifest: manifest, buildInfo: buildInfo);
+  final String? buildName = parsedBuildName(manifest: manifest, buildInfo: buildInfo);
   final bool buildNameIsMissing = buildName == null || buildName.isEmpty;
 
   if (buildNameIsMissing) {
     globals.printStatus('Warning: Missing build name (CFBundleShortVersionString).');
   }
 
-  final String buildNumber = parsedBuildNumber(manifest: manifest, buildInfo: buildInfo);
+  final String? buildNumber = parsedBuildNumber(manifest: manifest, buildInfo: buildInfo);
   final bool buildNumberIsMissing = buildNumber == null || buildNumber.isEmpty;
 
   if (buildNumberIsMissing) {
@@ -175,16 +196,18 @@ Future<XcodeBuildResult> buildXcodeProject({
       'file version field before submitting to the App Store.');
   }
 
-  Map<String, String> autoSigningConfigs;
+  Map<String, String>? autoSigningConfigs;
 
   final Map<String, String> buildSettings = await app.project.buildSettingsForBuildInfo(
         buildInfo,
-        environmentType: buildForDevice ? EnvironmentType.physical : EnvironmentType.simulator,
+        environmentType: environmentType,
+        deviceId: deviceID,
       ) ?? <String, String>{};
 
-  if (codesign && buildForDevice) {
-    autoSigningConfigs = await getCodeSigningIdentityDevelopmentTeam(
+  if (codesign && environmentType == EnvironmentType.physical) {
+    autoSigningConfigs = await getCodeSigningIdentityDevelopmentTeamBuildSetting(
       buildSettings: buildSettings,
+      platform: globals.platform,
       processManager: globals.processManager,
       logger: globals.logger,
       config: globals.config,
@@ -204,7 +227,7 @@ Future<XcodeBuildResult> buildXcodeProject({
   }
 
   final List<String> buildCommands = <String>[
-    ...globals.xcode.xcrunCommand(),
+    ...globals.xcode!.xcrunCommand(),
     'xcodebuild',
     '-configuration',
     configuration,
@@ -242,29 +265,36 @@ Future<XcodeBuildResult> buildXcodeProject({
 
   // Check if the project contains a watchOS companion app.
   final bool hasWatchCompanion = await app.project.containsWatchCompanion(
-    projectInfo.targets,
-    buildInfo,
+    projectInfo: projectInfo,
+    buildInfo: buildInfo,
+    deviceId: deviceID,
   );
   if (hasWatchCompanion) {
     // The -sdk argument has to be omitted if a watchOS companion app exists.
     // Otherwise the build will fail as WatchKit dependencies cannot be build using the iOS SDK.
-    globals.printStatus('Watch companion app found. Adjusting build settings.');
-    if (!buildForDevice && (deviceID == null || deviceID == '')) {
+    globals.printStatus('Watch companion app found.');
+    if (environmentType == EnvironmentType.simulator && (deviceID == null || deviceID == '')) {
       globals.printError('No simulator device ID has been set.');
       globals.printError('A device ID is required to build an app with a watchOS companion app.');
       globals.printError('Please run "flutter devices" to get a list of available device IDs');
       globals.printError('and specify one using the -d, --device-id flag.');
       return XcodeBuildResult(success: false);
     }
-    if (!buildForDevice) {
-      buildCommands.addAll(<String>['-destination', 'id=$deviceID']);
-    }
   } else {
-    if (buildForDevice) {
+    if (environmentType == EnvironmentType.physical) {
       buildCommands.addAll(<String>['-sdk', 'iphoneos']);
     } else {
       buildCommands.addAll(<String>['-sdk', 'iphonesimulator']);
     }
+  }
+
+  buildCommands.add('-destination');
+  if (deviceID != null) {
+    buildCommands.add('id=$deviceID');
+  } else if (environmentType == EnvironmentType.physical) {
+    buildCommands.add('generic/platform=iOS');
+  } else {
+    buildCommands.add('generic/platform=iOS Simulator');
   }
 
   if (activeArch != null) {
@@ -272,7 +302,7 @@ Future<XcodeBuildResult> buildXcodeProject({
     if (activeArchName != null) {
       buildCommands.add('ONLY_ACTIVE_ARCH=YES');
       // Setting ARCHS to $activeArchName will break the build if a watchOS companion app exists,
-      // as it cannot be build for the architecture of the flutter app.
+      // as it cannot be build for the architecture of the Flutter app.
       if (!hasWatchCompanion) {
         buildCommands.add('ARCHS=$activeArchName');
       }
@@ -289,86 +319,101 @@ Future<XcodeBuildResult> buildXcodeProject({
     );
   }
 
-  Status buildSubStatus;
-  Status initialBuildStatus;
-  Directory tempDir;
+  Status? buildSubStatus;
+  Status? initialBuildStatus;
+  File? scriptOutputPipeFile;
+  RunResult? buildResult;
+  XCResult? xcResult;
 
-  File scriptOutputPipeFile;
-  if (globals.logger.hasTerminal) {
-    tempDir = globals.fs.systemTempDirectory.createTempSync('flutter_build_log_pipe.');
-    scriptOutputPipeFile = tempDir.childFile('pipe_to_stdout');
-    globals.os.makePipe(scriptOutputPipeFile.path);
+  final Directory tempDir = globals.fs.systemTempDirectory.createTempSync('flutter_ios_build_temp_dir');
+  try {
+    if (globals.logger.hasTerminal) {
+      scriptOutputPipeFile = tempDir.childFile('pipe_to_stdout');
+      globals.os.makePipe(scriptOutputPipeFile.path);
 
-    Future<void> listenToScriptOutputLine() async {
-      final List<String> lines = await scriptOutputPipeFile.readAsLines();
-      for (final String line in lines) {
-        if (line == 'done' || line == 'all done') {
-          buildSubStatus?.stop();
-          buildSubStatus = null;
-          if (line == 'all done') {
-            // Free pipe file.
-            tempDir?.deleteSync(recursive: true);
-            return;
+      Future<void> listenToScriptOutputLine() async {
+        final List<String> lines = await scriptOutputPipeFile!.readAsLines();
+        for (final String line in lines) {
+          if (line == 'done' || line == 'all done') {
+            buildSubStatus?.stop();
+            buildSubStatus = null;
+            if (line == 'all done') {
+              return;
+            }
+          } else {
+            initialBuildStatus?.cancel();
+            initialBuildStatus = null;
+            buildSubStatus = globals.logger.startProgress(
+              line,
+              progressIndicatorPadding: kDefaultStatusPadding - 7,
+            );
           }
-        } else {
-          initialBuildStatus?.cancel();
-          initialBuildStatus = null;
-          buildSubStatus = globals.logger.startProgress(
-            line,
-            progressIndicatorPadding: kDefaultStatusPadding - 7,
-          );
         }
+        await listenToScriptOutputLine();
       }
-      await listenToScriptOutputLine();
+
+      // Trigger the start of the pipe -> stdout loop. Ignore exceptions.
+      unawaited(listenToScriptOutputLine());
+
+      buildCommands.add('SCRIPT_OUTPUT_STREAM_FILE=${scriptOutputPipeFile.absolute.path}');
     }
 
-    // Trigger the start of the pipe -> stdout loop. Ignore exceptions.
-    unawaited(listenToScriptOutputLine());
-
-    buildCommands.add('SCRIPT_OUTPUT_STREAM_FILE=${scriptOutputPipeFile.absolute.path}');
-  }
-
-  // Don't log analytics for downstream Flutter commands.
-  // e.g. `flutter build bundle`.
-  buildCommands.add('FLUTTER_SUPPRESS_ANALYTICS=true');
-  buildCommands.add('COMPILER_INDEX_STORE_ENABLE=NO');
-  buildCommands.addAll(environmentVariablesAsXcodeBuildSettings(globals.platform));
-
-  if (buildAction == XcodeBuildAction.archive) {
     buildCommands.addAll(<String>[
-      '-archivePath',
-      globals.fs.path.absolute(app.archiveBundlePath),
-      'archive',
+      '-resultBundlePath',
+      tempDir.childFile(_kResultBundlePath).absolute.path,
+      '-resultBundleVersion',
+      _kResultBundleVersion,
     ]);
+
+    // Don't log analytics for downstream Flutter commands.
+    // e.g. `flutter build bundle`.
+    buildCommands.add('FLUTTER_SUPPRESS_ANALYTICS=true');
+    buildCommands.add('COMPILER_INDEX_STORE_ENABLE=NO');
+    buildCommands.addAll(environmentVariablesAsXcodeBuildSettings(globals.platform));
+
+    if (buildAction == XcodeBuildAction.archive) {
+      buildCommands.addAll(<String>[
+        '-archivePath',
+        globals.fs.path.absolute(app.archiveBundlePath),
+        'archive',
+      ]);
+    }
+
+    final Stopwatch sw = Stopwatch()..start();
+    initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
+
+    buildResult = await _runBuildWithRetries(buildCommands, app);
+
+    // Notifies listener that no more output is coming.
+    scriptOutputPipeFile?.writeAsStringSync('all done');
+    buildSubStatus?.stop();
+    buildSubStatus = null;
+    initialBuildStatus?.cancel();
+    initialBuildStatus = null;
+    globals.printStatus(
+      'Xcode ${xcodeBuildActionToString(buildAction)} done.'.padRight(kDefaultStatusPadding + 1)
+          + getElapsedAsSeconds(sw.elapsed).padLeft(5),
+    );
+    globals.flutterUsage.sendTiming(xcodeBuildActionToString(buildAction), 'xcode-ios', Duration(milliseconds: sw.elapsedMilliseconds));
+
+    if (tempDir.existsSync()) {
+      // Display additional warning and error message from xcresult bundle.
+      final Directory resultBundle = tempDir.childDirectory(_kResultBundlePath);
+      if (!resultBundle.existsSync()) {
+        globals.printTrace('The xcresult bundle are not generated. Displaying xcresult is disabled.');
+      } else {
+        // Discard unwanted errors. See: https://github.com/flutter/flutter/issues/95354
+        final XCResultIssueDiscarder warningDiscarder = XCResultIssueDiscarder(typeMatcher: XCResultIssueType.warning);
+        final XCResultIssueDiscarder dartBuildErrorDiscarder = XCResultIssueDiscarder(messageMatcher: RegExp(r'Command PhaseScriptExecution failed with a nonzero exit code'));
+        final XCResultGenerator xcResultGenerator = XCResultGenerator(resultPath: resultBundle.absolute.path, xcode: globals.xcode!, processUtils: globals.processUtils);
+        xcResult = await xcResultGenerator.generate(issueDiscarders: <XCResultIssueDiscarder>[warningDiscarder, dartBuildErrorDiscarder]);
+      }
+    }
+  } finally {
+    tempDir.deleteSync(recursive: true);
   }
-
-  final Stopwatch sw = Stopwatch()..start();
-  initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
-
-  final RunResult buildResult = await _runBuildWithRetries(buildCommands, app);
-
-  // Notifies listener that no more output is coming.
-  scriptOutputPipeFile?.writeAsStringSync('all done');
-  buildSubStatus?.stop();
-  buildSubStatus = null;
-  initialBuildStatus?.cancel();
-  initialBuildStatus = null;
-  globals.printStatus(
-    'Xcode ${xcodeBuildActionToString(buildAction)} done.'.padRight(kDefaultStatusPadding + 1)
-        + getElapsedAsSeconds(sw.elapsed).padLeft(5),
-  );
-  globals.flutterUsage.sendTiming(xcodeBuildActionToString(buildAction), 'xcode-ios', Duration(milliseconds: sw.elapsedMilliseconds));
-
-  if (buildResult.exitCode != 0) {
+  if (buildResult != null && buildResult.exitCode != 0) {
     globals.printStatus('Failed to build iOS app');
-    if (buildResult.stderr.isNotEmpty) {
-      globals.printStatus('Error output from Xcode build:\n↳');
-      globals.printStatus(buildResult.stderr, indent: 4);
-    }
-    if (buildResult.stdout.isNotEmpty) {
-      globals.printStatus("Xcode's output:\n↳");
-      globals.printStatus(buildResult.stdout, indent: 4);
-    }
     return XcodeBuildResult(
       success: false,
       stdout: buildResult.stdout,
@@ -376,23 +421,28 @@ Future<XcodeBuildResult> buildXcodeProject({
       xcodeBuildExecution: XcodeBuildExecution(
         buildCommands: buildCommands,
         appDirectory: app.project.hostAppRoot.path,
-        buildForPhysicalDevice: buildForDevice,
+        environmentType: environmentType,
         buildSettings: buildSettings,
       ),
+      xcResult: xcResult,
     );
   } else {
-    String outputDir;
+    String? outputDir;
     if (buildAction == XcodeBuildAction.build) {
       // If the app contains a watch companion target, the sdk argument of xcodebuild has to be omitted.
       // For some reason this leads to TARGET_BUILD_DIR always ending in 'iphoneos' even though the
       // actual directory will end with 'iphonesimulator' for simulator builds.
       // The value of TARGET_BUILD_DIR is adjusted to accommodate for this effect.
-      String targetBuildDir = buildSettings['TARGET_BUILD_DIR'];
-      if (hasWatchCompanion && !buildForDevice) {
+      String? targetBuildDir = buildSettings['TARGET_BUILD_DIR'];
+      if (targetBuildDir == null) {
+        globals.printError('Xcode build is missing expected TARGET_BUILD_DIR build setting.');
+        return XcodeBuildResult(success: false);
+      }
+      if (hasWatchCompanion && environmentType == EnvironmentType.simulator) {
         globals.printTrace('Replacing iphoneos with iphonesimulator in TARGET_BUILD_DIR.');
         targetBuildDir = targetBuildDir.replaceFirst('iphoneos', 'iphonesimulator');
       }
-      final String appBundle = buildSettings['WRAPPER_NAME'];
+      final String? appBundle = buildSettings['WRAPPER_NAME'];
       final String expectedOutputDirectory = globals.fs.path.join(
         targetBuildDir,
         appBundle,
@@ -409,6 +459,7 @@ Future<XcodeBuildResult> buildXcodeProject({
         await globals.processUtils.run(
           <String>[
             'rsync',
+            '-8', // Avoid mangling filenames with encodings that do not match the current locale.
             '-av',
             '--delete',
             expectedOutputDirectory,
@@ -435,9 +486,10 @@ Future<XcodeBuildResult> buildXcodeProject({
         xcodeBuildExecution: XcodeBuildExecution(
           buildCommands: buildCommands,
           appDirectory: app.project.hostAppRoot.path,
-          buildForPhysicalDevice: buildForDevice,
+          environmentType: environmentType,
           buildSettings: buildSettings,
       ),
+      xcResult: xcResult,
     );
   }
 }
@@ -461,11 +513,11 @@ Future<void> removeFinderExtendedAttributes(Directory projectDirectory, ProcessU
   }
 }
 
-Future<RunResult> _runBuildWithRetries(List<String> buildCommands, BuildableIOSApp app) async {
+Future<RunResult?> _runBuildWithRetries(List<String> buildCommands, BuildableIOSApp app) async {
   int buildRetryDelaySeconds = 1;
   int remainingTries = 8;
 
-  RunResult buildResult;
+  RunResult? buildResult;
   while (remainingTries > 0) {
     remainingTries--;
     buildRetryDelaySeconds *= 2;
@@ -505,67 +557,24 @@ return result.exitCode != 0 &&
 }
 
 Future<void> diagnoseXcodeBuildFailure(XcodeBuildResult result, Usage flutterUsage, Logger logger) async {
-  if (result.xcodeBuildExecution != null &&
-      result.xcodeBuildExecution.buildForPhysicalDevice &&
-      result.stdout?.toUpperCase()?.contains('BITCODE') == true) {
+  final XcodeBuildExecution? xcodeBuildExecution = result.xcodeBuildExecution;
+  if (xcodeBuildExecution != null
+      && xcodeBuildExecution.environmentType == EnvironmentType.physical
+      && (result.stdout?.toUpperCase().contains('BITCODE') ?? false)) {
     BuildEvent('xcode-bitcode-failure',
       type: 'ios',
-      command: result.xcodeBuildExecution.buildCommands.toString(),
-      settings: result.xcodeBuildExecution.buildSettings.toString(),
+      command: xcodeBuildExecution.buildCommands.toString(),
+      settings: xcodeBuildExecution.buildSettings.toString(),
       flutterUsage: flutterUsage,
     ).send();
   }
 
-  // Building for iOS Simulator, but the linked and embedded framework 'App.framework' was built for iOS.
-  // or
-  // Building for iOS, but the linked and embedded framework 'App.framework' was built for iOS Simulator.
-  if (result.stdout?.contains('Building for iOS') == true
-      && result.stdout?.contains('but the linked and embedded framework') == true
-      && result.stdout?.contains('was built for iOS') == true) {
-    logger.printError('');
-    logger.printError('Your Xcode project requires migration. See https://flutter.dev/docs/development/ios-project-migration for details.');
-    logger.printError('');
-    logger.printError('You can temporarily work around this issue by running:');
-    logger.printError('  flutter clean');
-    return;
-  }
+  // Handle errors.
+  final bool issueDetected = _handleIssues(result.xcResult, logger, xcodeBuildExecution);
 
-  if (result.xcodeBuildExecution != null &&
-      result.xcodeBuildExecution.buildForPhysicalDevice &&
-      result.stdout?.contains('BCEROR') == true &&
-      // May need updating if Xcode changes its outputs.
-      result.stdout?.contains("Xcode couldn't find a provisioning profile matching") == true) {
-    logger.printError(noProvisioningProfileInstruction, emphasis: true);
-    return;
-  }
-  // Make sure the user has specified one of:
-  // * DEVELOPMENT_TEAM (automatic signing)
-  // * PROVISIONING_PROFILE (manual signing)
-  if (result.xcodeBuildExecution != null &&
-      result.xcodeBuildExecution.buildForPhysicalDevice &&
-      !<String>['DEVELOPMENT_TEAM', 'PROVISIONING_PROFILE'].any(
-        result.xcodeBuildExecution.buildSettings.containsKey)) {
-    logger.printError(noDevelopmentTeamInstruction, emphasis: true);
-    return;
-  }
-  if (result.xcodeBuildExecution != null &&
-      result.xcodeBuildExecution.buildForPhysicalDevice &&
-      result.xcodeBuildExecution.buildSettings['PRODUCT_BUNDLE_IDENTIFIER']?.contains('com.example') == true) {
-    logger.printError('');
-    logger.printError('It appears that your application still contains the default signing identifier.');
-    logger.printError("Try replacing 'com.example' with your signing id in Xcode:");
-    logger.printError('  open ios/Runner.xcworkspace');
-    return;
-  }
-  if (result.stdout?.contains('Code Sign error') == true) {
-    logger.printError('');
-    logger.printError('It appears that there was a problem signing your application prior to installation on the device.');
-    logger.printError('');
-    logger.printError('Verify that the Bundle Identifier in your project is your signing id in Xcode');
-    logger.printError('  open ios/Runner.xcworkspace');
-    logger.printError('');
-    logger.printError("Also try selecting 'Product > Build' to fix the problem:");
-    return;
+  if (!issueDetected && xcodeBuildExecution != null) {
+    // Fallback to use stdout to detect and print issues.
+    _parseIssueInStdout(xcodeBuildExecution, logger, result);
   }
 }
 
@@ -580,41 +589,44 @@ String xcodeBuildActionToString(XcodeBuildAction action) {
         return 'build';
       case XcodeBuildAction.archive:
         return 'archive';
-      default:
-        throw UnsupportedError('Unknown Xcode build action');
     }
 }
 
 class XcodeBuildResult {
   XcodeBuildResult({
-    @required this.success,
+    required this.success,
     this.output,
     this.stdout,
     this.stderr,
     this.xcodeBuildExecution,
+    this.xcResult
   });
 
   final bool success;
-  final String output;
-  final String stdout;
-  final String stderr;
+  final String? output;
+  final String? stdout;
+  final String? stderr;
   /// The invocation of the build that resulted in this result instance.
-  final XcodeBuildExecution xcodeBuildExecution;
+  final XcodeBuildExecution? xcodeBuildExecution;
+  /// Parsed information in xcresult bundle.
+  ///
+  /// Can be null if the bundle is not created during build.
+  final XCResult? xcResult;
 }
 
 /// Describes an invocation of a Xcode build command.
 class XcodeBuildExecution {
   XcodeBuildExecution({
-    @required this.buildCommands,
-    @required this.appDirectory,
-    @required this.buildForPhysicalDevice,
-    @required this.buildSettings,
+    required this.buildCommands,
+    required this.appDirectory,
+    required this.environmentType,
+    required this.buildSettings,
   });
 
   /// The original list of Xcode build commands used to produce this build result.
   final List<String> buildCommands;
   final String appDirectory;
-  final bool buildForPhysicalDevice;
+  final EnvironmentType environmentType;
   /// The build settings corresponding to the [buildCommands] invocation.
   final Map<String, String> buildSettings;
 }
@@ -625,12 +637,13 @@ bool _checkXcodeVersion() {
   if (!globals.platform.isMacOS) {
     return false;
   }
-  if (!globals.xcodeProjectInterpreter.isInstalled) {
+  final XcodeProjectInterpreter? xcodeProjectInterpreter = globals.xcodeProjectInterpreter;
+  if (xcodeProjectInterpreter?.isInstalled != true) {
     globals.printError('Cannot find "xcodebuild". $_xcodeRequirement');
     return false;
   }
-  if (!globals.xcode.isRequiredVersionSatisfactory) {
-    globals.printError('Found "${globals.xcodeProjectInterpreter.versionText}". $_xcodeRequirement');
+  if (globals.xcode?.isRequiredVersionSatisfactory != true) {
+    globals.printError('Found "${xcodeProjectInterpreter?.versionText}". $_xcodeRequirement');
     return false;
   }
   return true;
@@ -647,10 +660,10 @@ bool upgradePbxProjWithFlutterAssets(IosProject project, Logger logger) {
   final Set<String> printedStatuses = <String>{};
 
   for (final String line in lines) {
-    final Match match = oldAssets.firstMatch(line);
+    final Match? match = oldAssets.firstMatch(line);
     if (match != null) {
-      if (printedStatuses.add(match.group(1))) {
-        logger.printStatus('Removing obsolete reference to ${match.group(1)} from ${project.xcodeProject?.basename}');
+      if (printedStatuses.add(match.group(1)!)) {
+        logger.printStatus('Removing obsolete reference to ${match.group(1)} from ${project.xcodeProject.basename}');
       }
     } else {
       buffer.writeln(line);
@@ -659,3 +672,137 @@ bool upgradePbxProjWithFlutterAssets(IosProject project, Logger logger) {
   xcodeProjectFile.writeAsStringSync(buffer.toString());
   return true;
 }
+
+_XCResultIssueHandlingResult _handleXCResultIssue({required XCResultIssue issue, required Logger logger}) {
+  // Issue summary from xcresult.
+  final StringBuffer issueSummaryBuffer = StringBuffer();
+  issueSummaryBuffer.write(issue.subType ?? 'Unknown');
+  issueSummaryBuffer.write(' (Xcode): ');
+  issueSummaryBuffer.writeln(issue.message ?? '');
+  if (issue.location != null ) {
+    issueSummaryBuffer.writeln(issue.location);
+  }
+  final String issueSummary = issueSummaryBuffer.toString();
+
+  switch (issue.type) {
+    case XCResultIssueType.error:
+      logger.printError(issueSummary);
+      break;
+    case XCResultIssueType.warning:
+      logger.printWarning(issueSummary);
+      break;
+  }
+
+  final String? message = issue.message;
+  if (message == null) {
+    return _XCResultIssueHandlingResult(requiresProvisioningProfile: false, hasProvisioningProfileIssue: false);
+  }
+
+  // Add more error messages for flutter users for some special errors.
+  if (message.toLowerCase().contains('requires a provisioning profile.')) {
+    return _XCResultIssueHandlingResult(requiresProvisioningProfile: true, hasProvisioningProfileIssue: true);
+  } else if (message.toLowerCase().contains('provisioning profile')) {
+    return _XCResultIssueHandlingResult(requiresProvisioningProfile: false, hasProvisioningProfileIssue: true);
+  }
+  return _XCResultIssueHandlingResult(requiresProvisioningProfile: false, hasProvisioningProfileIssue: false);
+}
+
+// Returns `true` if at least one issue is detected.
+bool _handleIssues(XCResult? xcResult, Logger logger, XcodeBuildExecution? xcodeBuildExecution) {
+  bool requiresProvisioningProfile = false;
+  bool hasProvisioningProfileIssue = false;
+  bool issueDetected = false;
+
+  if (xcResult != null && xcResult.parseSuccess) {
+    for (final XCResultIssue issue in xcResult.issues) {
+      final _XCResultIssueHandlingResult handlingResult = _handleXCResultIssue(issue: issue, logger: logger);
+      if (handlingResult.hasProvisioningProfileIssue) {
+        hasProvisioningProfileIssue = true;
+      }
+      if (handlingResult.requiresProvisioningProfile) {
+        requiresProvisioningProfile = true;
+      }
+      issueDetected = true;
+    }
+  } else if (xcResult != null) {
+    globals.printTrace('XCResult parsing error: ${xcResult.parsingErrorMessage}');
+  }
+
+  if (requiresProvisioningProfile) {
+    logger.printError(noProvisioningProfileInstruction, emphasis: true);
+  } else if ((!issueDetected || hasProvisioningProfileIssue) && _missingDevelopmentTeam(xcodeBuildExecution)) {
+    issueDetected = true;
+    logger.printError(noDevelopmentTeamInstruction, emphasis: true);
+  } else if (hasProvisioningProfileIssue) {
+    logger.printError('');
+    logger.printError('It appears that there was a problem signing your application prior to installation on the device.');
+    logger.printError('');
+    logger.printError('Verify that the Bundle Identifier in your project is your signing id in Xcode');
+    logger.printError('  open ios/Runner.xcworkspace');
+    logger.printError('');
+    logger.printError("Also try selecting 'Product > Build' to fix the problem.");
+  }
+
+  if (!issueDetected && _needUpdateSigningIdentifier(xcodeBuildExecution)) {
+    issueDetected = true;
+    logger.printError('');
+    logger.printError('It appears that your application still contains the default signing identifier.');
+    logger.printError("Try replacing 'com.example' with your signing id in Xcode:");
+    logger.printError('  open ios/Runner.xcworkspace');
+  }
+  return issueDetected;
+}
+
+// Return 'true' a missing development team issue is detected.
+bool _missingDevelopmentTeam(XcodeBuildExecution? xcodeBuildExecution) {
+  // Make sure the user has specified one of:
+  // * DEVELOPMENT_TEAM (automatic signing)
+  // * PROVISIONING_PROFILE (manual signing)
+  return xcodeBuildExecution != null && xcodeBuildExecution.environmentType == EnvironmentType.physical &&
+      !<String>['DEVELOPMENT_TEAM', 'PROVISIONING_PROFILE'].any(
+        xcodeBuildExecution.buildSettings.containsKey);
+}
+
+// Return `true` if the signing identifier needs to be updated.
+bool _needUpdateSigningIdentifier(XcodeBuildExecution? xcodeBuildExecution) {
+  return xcodeBuildExecution != null
+      && xcodeBuildExecution.environmentType == EnvironmentType.physical
+      && (xcodeBuildExecution.buildSettings['PRODUCT_BUNDLE_IDENTIFIER']?.contains('com.example') ?? false);
+}
+
+// Detects and handles errors from stdout.
+//
+// As detecting issues in stdout is not usually accurate, this should be used as a fallback when other issue detecting methods failed.
+void _parseIssueInStdout(XcodeBuildExecution xcodeBuildExecution, Logger logger, XcodeBuildResult result) {
+  final String? stderr = result.stderr;
+  if (stderr != null && stderr.isNotEmpty) {
+    logger.printStatus('Error output from Xcode build:\n↳');
+    logger.printStatus(stderr, indent: 4);
+  }
+  final String? stdout = result.stdout;
+  if (stdout != null && stdout.isNotEmpty) {
+    logger.printStatus("Xcode's output:\n↳");
+    logger.printStatus(stdout, indent: 4);
+  }
+
+  if (xcodeBuildExecution.environmentType == EnvironmentType.physical
+      // May need updating if Xcode changes its outputs.
+      && (result.stdout?.contains('requires a provisioning profile. Select a provisioning profile in the Signing & Capabilities editor') ?? false)) {
+    logger.printError(noProvisioningProfileInstruction, emphasis: true);
+  }
+}
+
+// The result of [_handleXCResultIssue].
+class _XCResultIssueHandlingResult {
+
+  _XCResultIssueHandlingResult({required this.requiresProvisioningProfile, required this.hasProvisioningProfileIssue});
+
+  // An issue indicates that user didn't provide the provisioning profile.
+  final bool requiresProvisioningProfile;
+
+  // An issue indicates that there is a provisioning profile issue.
+  final bool hasProvisioningProfileIssue;
+}
+
+const String _kResultBundlePath = 'temporary_xcresult_bundle';
+const String _kResultBundleVersion = '3';

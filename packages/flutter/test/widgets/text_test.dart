@@ -164,7 +164,7 @@ void main() {
       ),
     );
     expect(tester.takeException(), null);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/42086
+  });
 
   testWidgets('inline widgets hitTest works with ellipsis', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/68559
@@ -200,7 +200,7 @@ void main() {
     await tester.tap(find.byType(Text));
 
     expect(tester.takeException(), null);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/42086
+  });
 
   testWidgets('inline widgets works with textScaleFactor', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/59316
@@ -262,7 +262,7 @@ void main() {
     renderText = tester.renderObject(find.byKey(key));
     // The RichText in the widget span should wrap into three lines.
     expect(renderText.size.height, singleLineHeight * textScaleFactor * 3);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/42086
+  });
 
   testWidgets('semanticsLabel can override text label', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
@@ -409,6 +409,75 @@ void main() {
         ignoreRect: true,
       ),
     );
+    semantics.dispose();
+  });
+
+  testWidgets('semantic nodes of offscreen recognizers are marked hidden', (WidgetTester tester) async {
+    // Regression test for https://github.com/flutter/flutter/issues/100395.
+    final SemanticsTester semantics = SemanticsTester(tester);
+    const TextStyle textStyle = TextStyle(fontFamily: 'Ahem', fontSize: 200);
+    const String onScreenText = 'onscreen\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n';
+    const String offScreenText = 'off screen';
+    final ScrollController controller = ScrollController();
+    await tester.pumpWidget(
+      SingleChildScrollView(
+        controller: controller,
+        child: Text.rich(
+          TextSpan(
+            children: <TextSpan>[
+              const TextSpan(text: onScreenText),
+              TextSpan(
+                text: offScreenText,
+                recognizer: TapGestureRecognizer()..onTap = () { },
+              ),
+            ],
+            style: textStyle,
+          ),
+          textDirection: TextDirection.ltr,
+        ),
+      ),
+    );
+
+    final TestSemantics expectedSemantics = TestSemantics.root(
+      children: <TestSemantics>[
+        TestSemantics(
+          flags: <SemanticsFlag>[SemanticsFlag.hasImplicitScrolling],
+          actions: <SemanticsAction>[SemanticsAction.scrollUp],
+          children: <TestSemantics>[
+            TestSemantics(
+              children: <TestSemantics>[
+                TestSemantics(
+                  label: onScreenText,
+                  textDirection: TextDirection.ltr,
+                ),
+                TestSemantics(
+                  label: offScreenText,
+                  textDirection: TextDirection.ltr,
+                  actions: <SemanticsAction>[SemanticsAction.tap],
+                  flags: <SemanticsFlag>[SemanticsFlag.isLink, SemanticsFlag.isHidden],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    expect(
+      semantics,
+      hasSemantics(
+        expectedSemantics,
+        ignoreTransform: true,
+        ignoreId: true,
+        ignoreRect: true,
+      ),
+    );
+
+    // Test show on screen.
+    expect(controller.offset, 0.0);
+    tester.binding.pipelineOwner.semanticsOwner!.performAction(4, SemanticsAction.showOnScreen);
+    await tester.pumpAndSettle();
+    expect(controller.offset != 0.0, isTrue);
+
     semantics.dispose();
   });
 
@@ -714,7 +783,7 @@ void main() {
       ),
     );
     semantics.dispose();
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/42086
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/62945
 
   testWidgets('inline widgets semantic nodes scale', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
@@ -794,7 +863,40 @@ void main() {
       ),
     );
     semantics.dispose();
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/42086
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/62945
+
+  testWidgets('receives fontFamilyFallback and package from root ThemeData', (WidgetTester tester) async {
+    const String fontFamily = 'fontFamily';
+    const String package = 'package_name';
+    final List<String> fontFamilyFallback = <String>['font', 'family', 'fallback'];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
+          package: package,
+          primarySwatch: Colors.blue,
+        ),
+        home: const Scaffold(
+          body: Center(
+            child: Text(
+              'foo',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(RichText), findsOneWidget);
+    final RichText richText = tester.widget(find.byType(RichText));
+    final InlineSpan text = richText.text;
+    final TextStyle? style = text.style;
+    expect(style?.fontFamily, equals('packages/$package/$fontFamily'));
+    for (int i = 0; i < fontFamilyFallback.length; i++) {
+      final String fallback = fontFamilyFallback[i];
+      expect(style?.fontFamilyFallback?[i], equals('packages/$package/$fallback'));
+    }
+  });
 
   testWidgets('Overflow is clipping correctly - short text with overflow: clip', (WidgetTester tester) async {
     await _pumpTextWidget(
@@ -817,7 +919,7 @@ void main() {
       find.byType(Text),
       paints..clipRect(rect: const Rect.fromLTWH(0, 0, 50, 50)),
     );
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/33523
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/87878
 
   testWidgets('Overflow is clipping correctly - short text with overflow: ellipsis', (WidgetTester tester) async {
     await _pumpTextWidget(
@@ -979,13 +1081,16 @@ void main() {
         );
 
       expect(find.byType(RichText), paints..something((Symbol method, List<dynamic> arguments) {
-        if (method != #drawParagraph)
+        if (method != #drawParagraph) {
           return false;
+        }
         final ui.Paragraph paragraph = arguments[0] as ui.Paragraph;
-        if (paragraph.longestLine > paragraph.width)
+        if (paragraph.longestLine > paragraph.width) {
           throw 'paragraph width (${paragraph.width}) greater than its longest line (${paragraph.longestLine}).';
-        if (paragraph.width >= 400)
+        }
+        if (paragraph.width >= 400) {
           throw 'paragraph.width (${paragraph.width}) >= 400';
+        }
         return true;
       }));
     },
@@ -998,6 +1103,7 @@ void main() {
     final ui.Paragraph paragraph = builder.build();
     paragraph.layout(const ui.ParagraphConstraints(width: 1000));
     expect(paragraph.getBoxesForRange(2, 2), isEmpty);
+    paragraph.dispose();
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/65818
@@ -1045,7 +1151,7 @@ void main() {
         ),
       ],
     )));
-  }, semanticsEnabled: true, skip: isBrowser); // Browser semantics have different sizes.
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/87877
 
   // Regression test for https://github.com/flutter/flutter/issues/69787
   testWidgets('WidgetSpans with no semantic information are elided from semantics - case 2', (WidgetTester tester) async {
@@ -1091,7 +1197,7 @@ void main() {
     ignoreRect: true,
     ignoreTransform: true,
     ));
-  }, semanticsEnabled: true, skip: isBrowser); // Browser does not support widget span.
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/87877
 
   // Regression test for https://github.com/flutter/flutter/issues/69787
   testWidgets('WidgetSpans with no semantic information are elided from semantics - case 3', (WidgetTester tester) async {
@@ -1149,7 +1255,7 @@ void main() {
     ignoreRect: true,
     ignoreTransform: true,
     ));
-  }, semanticsEnabled: true, skip: isBrowser); // Browser does not support widget span.
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/87877
 
   // Regression test for https://github.com/flutter/flutter/issues/69787
   testWidgets('WidgetSpans with no semantic information are elided from semantics - case 4', (WidgetTester tester) async {
@@ -1215,7 +1321,7 @@ void main() {
     ignoreRect: true,
     ignoreTransform: true,
     ));
-  }, semanticsEnabled: true, skip: isBrowser); // Browser does not support widget span
+  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/87877
 
   testWidgets('RenderParagraph intrinsic width', (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -1261,7 +1367,7 @@ void main() {
   testWidgets('Text uses TextStyle.overflow', (WidgetTester tester) async {
     const TextOverflow overflow = TextOverflow.fade;
 
-    await tester.pumpWidget( const Text(
+    await tester.pumpWidget(const Text(
       'Hello World',
       textDirection: TextDirection.ltr,
       style: TextStyle(overflow: overflow),
@@ -1271,6 +1377,42 @@ void main() {
 
     expect(richText.overflow, overflow);
     expect(richText.text.style!.overflow, overflow);
+  });
+
+  testWidgets(
+    'Text can be hit-tested without layout or paint being called in a frame',
+    (WidgetTester tester) async {
+      // Regression test for https://github.com/flutter/flutter/issues/85108.
+      await tester.pumpWidget(
+        const Opacity(
+          opacity: 1.0,
+          child: Text(
+            'Hello World',
+            textDirection: TextDirection.ltr,
+            style: TextStyle(color: Color(0xFF123456)),
+          ),
+        ),
+      );
+
+      // The color changed and the opacity is set to 0:
+      //  * 0 opacity will prevent RenderParagraph.paint from being called.
+      //  * Only changing the color will prevent RenderParagraph.performLayout
+      //    from being called.
+      //  The underlying TextPainter should not evict its layout cache in this
+      //  case, for hit-testing.
+      await tester.pumpWidget(
+        const Opacity(
+          opacity: 0.0,
+          child: Text(
+            'Hello World',
+            textDirection: TextDirection.ltr,
+            style: TextStyle(color: Color(0x87654321)),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Hello World'));
+      expect(tester.takeException(), isNull);
   });
 }
 

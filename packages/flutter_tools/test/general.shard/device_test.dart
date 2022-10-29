@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_tools/src/base/io.dart';
 import 'package:flutter_tools/src/base/logger.dart';
-import 'package:flutter_tools/src/base/terminal.dart';
-import 'package:flutter_tools/src/base/user_messages.dart';
+import 'package:flutter_tools/src/base/utils.dart';
 import 'package:flutter_tools/src/build_info.dart';
+import 'package:flutter_tools/src/convert.dart';
 import 'package:flutter_tools/src/device.dart';
 import 'package:flutter_tools/src/project.dart';
-import 'package:meta/meta.dart';
 import 'package:test/fake.dart';
 
 import '../src/common.dart';
@@ -31,7 +28,6 @@ void main() {
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
 
       expect(await deviceManager.getDevices(), devices);
@@ -57,7 +53,6 @@ void main() {
           LongPollingDeviceDiscovery(),
         ],
         logger: logger,
-        terminal: Terminal.test(),
       );
 
       Future<void> expectDevice(String id, List<Device> expected) async {
@@ -69,6 +64,32 @@ void main() {
       expect(logger.traceText, contains('Ignored error discovering Nexus 5X'));
       await expectDevice('0553790d0a4e726f', <Device>[device1]);
       expect(logger.traceText, contains('Ignored error discovering 0553790d0a4e726f'));
+    });
+
+    testWithoutContext('getDeviceById exact matcher with well known ID', () async {
+      final FakeDevice device1 = FakeDevice('Windows', 'windows');
+      final FakeDevice device2 = FakeDevice('Nexus 5X', '01abfc49119c410e');
+      final FakeDevice device3 = FakeDevice('iPod touch', '82564b38861a9a5');
+      final List<Device> devices = <Device>[device1, device2, device3];
+      final BufferLogger logger = BufferLogger.test();
+
+      // Because the well known ID will match, no other device discovery will run.
+      final DeviceManager deviceManager = TestDeviceManager(
+        devices,
+        deviceDiscoveryOverrides: <DeviceDiscovery>[
+          ThrowingPollingDeviceDiscovery(),
+          LongPollingDeviceDiscovery(),
+        ],
+        logger: logger,
+        wellKnownId: 'windows',
+      );
+
+      Future<void> expectDevice(String id, List<Device> expected) async {
+        deviceManager.specifiedDeviceId = id;
+        expect(await deviceManager.getDevicesById(id), expected);
+      }
+      await expectDevice('windows', <Device>[device1]);
+      expect(logger.traceText, isEmpty);
     });
 
     testWithoutContext('getDeviceById prefix matcher', () async {
@@ -88,7 +109,6 @@ void main() {
           ThrowingPollingDeviceDiscovery(),
         ],
         logger: logger,
-        terminal: Terminal.test(),
       );
 
       Future<void> expectDevice(String id, List<Device> expected) async {
@@ -107,7 +127,6 @@ void main() {
       final TestDeviceManager deviceManager = TestDeviceManager(
         <Device>[device1],
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       expect(await deviceManager.getAllConnectedDevices(), <Device>[device1]);
 
@@ -121,7 +140,6 @@ void main() {
       final TestDeviceManager deviceManager = TestDeviceManager(
         <Device>[device1],
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       expect(await deviceManager.refreshAllConnectedDevices(), <Device>[device1]);
 
@@ -155,6 +173,7 @@ void main() {
     final FakeDevice nonEphemeralOne = FakeDevice('nonEphemeralOne', 'nonEphemeralOne', ephemeral: false);
     final FakeDevice nonEphemeralTwo = FakeDevice('nonEphemeralTwo', 'nonEphemeralTwo', ephemeral: false);
     final FakeDevice unsupported = FakeDevice('unsupported', 'unsupported', isSupported: false);
+    final FakeDevice unsupportedForProject = FakeDevice('unsupportedForProject', 'unsupportedForProject', isSupportedForProject: false);
     final FakeDevice webDevice = FakeDevice('webby', 'webby')
       ..targetPlatform = Future<TargetPlatform>.value(TargetPlatform.web_javascript);
     final FakeDevice fuchsiaDevice = FakeDevice('fuchsiay', 'fuchsiay')
@@ -166,100 +185,19 @@ void main() {
         nonEphemeralOne,
         nonEphemeralTwo,
         unsupported,
+        unsupportedForProject,
       ];
 
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
 
       expect(filtered.single, ephemeralOne);
     });
 
-    testWithoutContext('choose first non-ephemeral device', () async {
-      final List<Device> devices = <Device>[
-        nonEphemeralOne,
-        nonEphemeralTwo,
-      ];
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', 'q', 'Q'], '1');
-
-      final DeviceManager deviceManager = TestDeviceManager(
-        devices,
-        logger: BufferLogger.test(),
-        terminal: terminal,
-      );
-      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
-
-      expect(filtered, <Device>[
-        nonEphemeralOne
-      ]);
-    });
-
-    testWithoutContext('choose second non-ephemeral device', () async {
-      final List<Device> devices = <Device>[
-        nonEphemeralOne,
-        nonEphemeralTwo,
-      ];
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', 'q', 'Q'], '2');
-
-      final DeviceManager deviceManager = TestDeviceManager(
-        devices,
-        logger: BufferLogger.test(),
-        terminal: terminal,
-      );
-      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
-
-      expect(filtered, <Device>[
-        nonEphemeralTwo
-      ]);
-    });
-
-    testWithoutContext('choose first ephemeral device', () async {
-      final List<Device> devices = <Device>[
-        ephemeralOne,
-        ephemeralTwo,
-      ];
-
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', 'q', 'Q'], '1');
-
-      final DeviceManager deviceManager = TestDeviceManager(
-        devices,
-        logger: BufferLogger.test(),
-        terminal: terminal,
-      );
-      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
-
-      expect(filtered, <Device>[
-        ephemeralOne
-      ]);
-    });
-
-    testWithoutContext('choose second ephemeral device', () async {
-      final List<Device> devices = <Device>[
-        ephemeralOne,
-        ephemeralTwo,
-      ];
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', 'q', 'Q'], '2');
-
-      final DeviceManager deviceManager = TestDeviceManager(
-        devices,
-        logger: BufferLogger.test(),
-        terminal: terminal,
-      );
-      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
-
-      expect(filtered, <Device>[
-        ephemeralTwo
-      ]);
-    });
-
-    testWithoutContext('choose non-ephemeral device', () async {
+    testWithoutContext('returns all devices when multiple non ephemeral devices are found', () async {
       final List<Device> devices = <Device>[
         ephemeralOne,
         ephemeralTwo,
@@ -267,70 +205,66 @@ void main() {
         nonEphemeralTwo,
       ];
 
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', '3', '4', 'q', 'Q'], '3');
-
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: terminal,
       );
 
       final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
 
       expect(filtered, <Device>[
-        nonEphemeralOne
+        ephemeralOne,
+        ephemeralTwo,
+        nonEphemeralOne,
+        nonEphemeralTwo,
       ]);
     });
 
-    testWithoutContext('exit from choose one of available devices', () async {
-      final List<Device> devices = <Device>[
-        ephemeralOne,
-        ephemeralTwo,
-      ];
-
-      final FakeTerminal terminal = FakeTerminal()
-        ..setPrompt(<String>['1', '2', 'q', 'Q'], 'q');
-
-      final DeviceManager deviceManager = TestDeviceManager(
-        devices,
-        logger: BufferLogger.test(),
-        terminal: terminal,
-      );
-      await expectLater(
-        () async => deviceManager.findTargetDevices(FakeFlutterProject()),
-        throwsToolExit(),
-      );
-    });
-
-    testWithoutContext('Removes a single unsupported device', () async {
+    testWithoutContext('Unsupported devices listed in all connected devices', () async {
       final List<Device> devices = <Device>[
         unsupported,
+        unsupportedForProject,
       ];
 
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
+      );
+      final List<Device> filtered = await deviceManager.getAllConnectedDevices();
+
+      expect(filtered, <Device>[
+        unsupported,
+        unsupportedForProject,
+      ]);
+    });
+
+    testWithoutContext('Removes a unsupported devices', () async {
+      final List<Device> devices = <Device>[
+        unsupported,
+        unsupportedForProject,
+      ];
+      final DeviceManager deviceManager = TestDeviceManager(
+        devices,
+        logger: BufferLogger.test(),
       );
       final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
 
       expect(filtered, <Device>[]);
     });
 
-    testWithoutContext('Does not remove an unsupported device if FlutterProject is null', () async {
+    testWithoutContext('Retains devices unsupported by the project if FlutterProject is null', () async {
       final List<Device> devices = <Device>[
         unsupported,
+        unsupportedForProject,
       ];
 
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       final List<Device> filtered = await deviceManager.findTargetDevices(null);
 
-      expect(filtered, <Device>[unsupported]);
+      expect(filtered, <Device>[unsupportedForProject]);
     });
 
     testWithoutContext('Removes web and fuchsia from --all', () async {
@@ -341,7 +275,6 @@ void main() {
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       deviceManager.specifiedDeviceId = 'all';
 
@@ -350,16 +283,16 @@ void main() {
       expect(filtered, <Device>[]);
     });
 
-    testWithoutContext('Removes unsupported devices from --all', () async {
+    testWithoutContext('Removes devices unsupported by the project from --all', () async {
       final List<Device> devices = <Device>[
         nonEphemeralOne,
         nonEphemeralTwo,
         unsupported,
+        unsupportedForProject,
       ];
       final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       deviceManager.specifiedDeviceId = 'all';
 
@@ -371,21 +304,72 @@ void main() {
       ]);
     });
 
-    testWithoutContext('uses DeviceManager.isDeviceSupportedForProject instead of device.isSupportedForProject', () async {
+    testWithoutContext('Returns device with the specified id', () async {
       final List<Device> devices = <Device>[
-        unsupported,
+        nonEphemeralOne,
       ];
-      final TestDeviceManager deviceManager = TestDeviceManager(
+      final DeviceManager deviceManager = TestDeviceManager(
         devices,
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
-      deviceManager.isAlwaysSupportedOverride = true;
+      deviceManager.specifiedDeviceId = nonEphemeralOne.id;
 
       final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
 
       expect(filtered, <Device>[
+        nonEphemeralOne,
+      ]);
+    });
+
+    testWithoutContext('Returns multiple devices when multiple devices matches the specified id', () async {
+      final List<Device> devices = <Device>[
+        nonEphemeralOne,
+        nonEphemeralTwo,
+      ];
+      final DeviceManager deviceManager = TestDeviceManager(
+        devices,
+        logger: BufferLogger.test(),
+      );
+      deviceManager.specifiedDeviceId = 'nonEphemeral'; // This prefix matches both devices
+
+      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
+
+      expect(filtered, <Device>[
+        nonEphemeralOne,
+        nonEphemeralTwo,
+      ]);
+    });
+
+    testWithoutContext('Returns empty when device of specified id is not found', () async {
+      final List<Device> devices = <Device>[
+        nonEphemeralOne,
+      ];
+      final DeviceManager deviceManager = TestDeviceManager(
+        devices,
+        logger: BufferLogger.test(),
+      );
+      deviceManager.specifiedDeviceId = nonEphemeralTwo.id;
+
+      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
+
+      expect(filtered, <Device>[]);
+    });
+
+    testWithoutContext('uses DeviceManager.isDeviceSupportedForProject instead of device.isSupportedForProject', () async {
+      final List<Device> devices = <Device>[
         unsupported,
+        unsupportedForProject,
+      ];
+      final TestDeviceManager deviceManager = TestDeviceManager(
+        devices,
+        logger: BufferLogger.test(),
+      );
+      deviceManager.isAlwaysSupportedForProjectOverride = true;
+
+      final List<Device> filtered = await deviceManager.findTargetDevices(FakeFlutterProject());
+
+      expect(filtered, <Device>[
+        unsupportedForProject,
       ]);
     });
 
@@ -399,10 +383,9 @@ void main() {
       final DeviceManager deviceManager = TestDeviceManager(
         <Device>[],
         deviceDiscoveryOverrides: <DeviceDiscovery>[
-          deviceDiscovery
+          deviceDiscovery,
         ],
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       deviceManager.specifiedDeviceId = ephemeralOne.id;
       final List<Device> filtered = await deviceManager.findTargetDevices(
@@ -425,10 +408,9 @@ void main() {
       final DeviceManager deviceManager = TestDeviceManager(
         <Device>[],
         deviceDiscoveryOverrides: <DeviceDiscovery>[
-          deviceDiscovery
+          deviceDiscovery,
         ],
         logger: BufferLogger.test(),
-        terminal: Terminal.test(),
       );
       deviceManager.specifiedDeviceId = ephemeralOne.id;
       final List<Device> filtered = await deviceManager.findTargetDevices(
@@ -454,42 +436,71 @@ void main() {
   });
 
   testWithoutContext('computeDartVmFlags handles various combinations of Dart VM flags and null_assertions', () {
-    expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug, dartFlags: null)), '');
+    expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug)), '');
     expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug, dartFlags: '--foo')), '--foo');
-    expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug, dartFlags: '', nullAssertions: true)), '--null_assertions');
+    expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug, nullAssertions: true)), '--null_assertions');
     expect(computeDartVmFlags(DebuggingOptions.enabled(BuildInfo.debug, dartFlags: '--foo', nullAssertions: true)), '--foo,--null_assertions');
+  });
+
+  group('JSON encode DebuggingOptions', () {
+    testWithoutContext('can preserve the original options', () {
+      final DebuggingOptions original = DebuggingOptions.enabled(
+        BuildInfo.debug,
+        startPaused: true,
+        disableServiceAuthCodes: true,
+        enableDds: false,
+        dartEntrypointArgs: <String>['a', 'b'],
+        dartFlags: 'c',
+        deviceVmServicePort: 1234,
+        enableImpeller: true,
+      );
+      final String jsonString = json.encode(original.toJson());
+      final Map<String, dynamic> decoded = castStringKeyedMap(json.decode(jsonString))!;
+      final DebuggingOptions deserialized = DebuggingOptions.fromJson(decoded, BuildInfo.debug);
+      expect(deserialized.startPaused, original.startPaused);
+      expect(deserialized.disableServiceAuthCodes, original.disableServiceAuthCodes);
+      expect(deserialized.enableDds, original.enableDds);
+      expect(deserialized.dartEntrypointArgs, original.dartEntrypointArgs);
+      expect(deserialized.dartFlags, original.dartFlags);
+      expect(deserialized.deviceVmServicePort, original.deviceVmServicePort);
+      expect(deserialized.enableImpeller, original.enableImpeller);
+    });
   });
 }
 
 class TestDeviceManager extends DeviceManager {
-    TestDeviceManager(List<Device> allDevices, {
-    List<DeviceDiscovery> deviceDiscoveryOverrides,
-    @required Logger logger,
-    @required Terminal terminal,
-  }) : super(logger: logger, terminal: terminal, userMessages: UserMessages()) {
-    _fakeDeviceDiscoverer = FakePollingDeviceDiscovery();
-    _deviceDiscoverers = <DeviceDiscovery>[
-      _fakeDeviceDiscoverer,
-      if (deviceDiscoveryOverrides != null)
-        ...deviceDiscoveryOverrides
-    ];
+  TestDeviceManager(
+    List<Device> allDevices, {
+    List<DeviceDiscovery>? deviceDiscoveryOverrides,
+    required super.logger,
+    String? wellKnownId,
+  }) : _fakeDeviceDiscoverer = FakePollingDeviceDiscovery(),
+       _deviceDiscoverers = <DeviceDiscovery>[],
+       super() {
+    if (wellKnownId != null) {
+      _fakeDeviceDiscoverer.wellKnownIds.add(wellKnownId);
+    }
+    _deviceDiscoverers.add(_fakeDeviceDiscoverer);
+    if (deviceDiscoveryOverrides != null) {
+      _deviceDiscoverers.addAll(deviceDiscoveryOverrides);
+    }
     resetDevices(allDevices);
   }
   @override
   List<DeviceDiscovery> get deviceDiscoverers => _deviceDiscoverers;
-  List<DeviceDiscovery> _deviceDiscoverers;
-  FakePollingDeviceDiscovery _fakeDeviceDiscoverer;
+  final List<DeviceDiscovery> _deviceDiscoverers;
+  final FakePollingDeviceDiscovery _fakeDeviceDiscoverer;
 
   void resetDevices(List<Device> allDevices) {
     _fakeDeviceDiscoverer.setDevices(allDevices);
   }
 
-  bool isAlwaysSupportedOverride;
+  bool? isAlwaysSupportedForProjectOverride;
 
   @override
-  bool isDeviceSupportedForProject(Device device, FlutterProject flutterProject) {
-    if (isAlwaysSupportedOverride != null) {
-      return isAlwaysSupportedOverride;
+  bool isDeviceSupportedForProject(Device device, FlutterProject? flutterProject) {
+    if (isAlwaysSupportedForProjectOverride != null) {
+      return isAlwaysSupportedForProjectOverride!;
     }
     return super.isDeviceSupportedForProject(device, flutterProject);
   }
@@ -511,13 +522,16 @@ class MockDeviceDiscovery extends Fake implements DeviceDiscovery {
   }
 
   @override
-  Future<List<Device>> discoverDevices({Duration timeout}) async {
+  Future<List<Device>> discoverDevices({Duration? timeout}) async {
     discoverDevicesCalled += 1;
     return deviceValues;
   }
+
+  @override
+  List<String> get wellKnownIds => <String>[];
 }
 
-class FakeFlutterProject extends Fake implements FlutterProject {}
+class FakeFlutterProject extends Fake implements FlutterProject { }
 
 class LongPollingDeviceDiscovery extends PollingDeviceDiscovery {
   LongPollingDeviceDiscovery() : super('forever');
@@ -525,18 +539,18 @@ class LongPollingDeviceDiscovery extends PollingDeviceDiscovery {
   final Completer<List<Device>> _completer = Completer<List<Device>>();
 
   @override
-  Future<List<Device>> pollingGetDevices({ Duration timeout }) async {
+  Future<List<Device>> pollingGetDevices({ Duration? timeout }) async {
     return _completer.future;
   }
 
   @override
   Future<void> stopPolling() async {
-    _completer.complete();
+    _completer.complete(<Device>[]);
   }
 
   @override
   Future<void> dispose() async {
-    _completer.complete();
+    _completer.complete(<Device>[]);
   }
 
   @override
@@ -544,13 +558,16 @@ class LongPollingDeviceDiscovery extends PollingDeviceDiscovery {
 
   @override
   bool get canListAnything => true;
+
+  @override
+  final List<String> wellKnownIds = <String>[];
 }
 
 class ThrowingPollingDeviceDiscovery extends PollingDeviceDiscovery {
   ThrowingPollingDeviceDiscovery() : super('throw');
 
   @override
-  Future<List<Device>> pollingGetDevices({ Duration timeout }) async {
+  Future<List<Device>> pollingGetDevices({ Duration? timeout }) async {
     throw const ProcessException('fake-discovery', <String>[]);
   }
 
@@ -559,32 +576,7 @@ class ThrowingPollingDeviceDiscovery extends PollingDeviceDiscovery {
 
   @override
   bool get canListAnything => true;
-}
-
-class FakeTerminal extends Fake implements Terminal {
-  @override
-  bool stdinHasTerminal = true;
 
   @override
-  bool usesTerminalUi = true;
-
-  void setPrompt(List<String> characters, String result) {
-    _nextPrompt = characters;
-    _nextResult = result;
-  }
-
-  List<String> _nextPrompt;
-  String _nextResult;
-
-  @override
-  Future<String> promptForCharInput(
-    List<String> acceptedCharacters, {
-    Logger logger,
-    String prompt,
-    int defaultChoiceIndex,
-    bool displayAcceptedCharacters = true,
-  }) async {
-    expect(acceptedCharacters, _nextPrompt);
-    return _nextResult;
-  }
+  List<String> get wellKnownIds => <String>[];
 }

@@ -21,40 +21,85 @@ void main() {
     );
 
     expect(iosWorkflow.appliesToHostPlatform, false);
+    expect(iosWorkflow.canLaunchDevices, false);
+    expect(iosWorkflow.canListDevices, false);
   });
 
   testWithoutContext('iOS workflow is disabled on Linux', () {
     final IOSWorkflow iosWorkflow = IOSWorkflow(
-      platform: FakePlatform(operatingSystem: 'linux'),
+      platform: FakePlatform(),
       xcode: Xcode.test(processManager: FakeProcessManager.any()),
-      featureFlags: TestFeatureFlags(isIOSEnabled: true),
+      featureFlags: TestFeatureFlags(),
     );
 
     expect(iosWorkflow.appliesToHostPlatform, false);
+    expect(iosWorkflow.canLaunchDevices, false);
+    expect(iosWorkflow.canListDevices, false);
   });
 
   testWithoutContext('iOS workflow is disabled on windows', () {
     final IOSWorkflow iosWorkflow = IOSWorkflow(
       platform: FakePlatform(operatingSystem: 'windows'),
       xcode: Xcode.test(processManager: FakeProcessManager.any()),
-      featureFlags: TestFeatureFlags(isIOSEnabled: true),
+      featureFlags: TestFeatureFlags(),
     );
 
     expect(iosWorkflow.appliesToHostPlatform, false);
+    expect(iosWorkflow.canLaunchDevices, false);
+    expect(iosWorkflow.canListDevices, false);
   });
 
-  testWithoutContext('iOS workflow is enabled on macOS', () {
+  testWithoutContext('iOS workflow applies on macOS, no Xcode or simctl', () {
+    final FakeProcessManager xcodeProcessManager = FakeProcessManager.list(<FakeCommand>[
+      const FakeCommand(
+        command: <String>[
+          'xcrun', 'simctl', 'list', 'devices', 'booted',
+        ],
+        exitCode: 1,
+      ),
+    ]);
     final IOSWorkflow iosWorkflow = IOSWorkflow(
       platform: FakePlatform(operatingSystem: 'macos'),
-      xcode: Xcode.test(processManager: FakeProcessManager.any()),
-      featureFlags: TestFeatureFlags(isIOSEnabled: true),
+      xcode: Xcode.test(processManager: xcodeProcessManager,
+        xcodeProjectInterpreter: XcodeProjectInterpreter.test(
+          processManager: FakeProcessManager.any(),
+          version: null,
+        ),
+      ),
+      featureFlags: TestFeatureFlags(),
     );
 
     expect(iosWorkflow.appliesToHostPlatform, true);
+    expect(iosWorkflow.canLaunchDevices, false);
+    expect(iosWorkflow.canListDevices, false);
+    expect(iosWorkflow.canListEmulators, false);
+    expect(xcodeProcessManager, hasNoRemainingExpectations);
+  });
+
+  testWithoutContext('iOS workflow can list devices even when Xcode version is too low', () {
+    final Xcode xcode = Xcode.test(
+      processManager: FakeProcessManager.any(),
+      xcodeProjectInterpreter: XcodeProjectInterpreter.test(
+          processManager: FakeProcessManager.any(),
+          version: Version(1, 0, 0)
+      ),
+    );
+
+    final IOSWorkflow iosWorkflow = IOSWorkflow(
+      platform: FakePlatform(operatingSystem: 'macos'),
+      xcode: xcode,
+      featureFlags: TestFeatureFlags(),
+    );
+
+    // Make sure we're testing the right Xcode state.
+    // expect(xcode.isInstalledAndMeetsVersionCheck, true);
+    expect(xcode.isSimctlInstalled, true);
+    expect(iosWorkflow.canLaunchDevices, false);
+    expect(iosWorkflow.canListDevices, true);
     expect(iosWorkflow.canListEmulators, false);
   });
 
-  testWithoutContext('iOS workflow can launch and list devices when Xcode is set up', () {
+  testWithoutContext('iOS workflow can launch devices when Xcode is set up', () {
     final Xcode xcode = Xcode.test(
       processManager: FakeProcessManager.any(),
       xcodeProjectInterpreter: XcodeProjectInterpreter.test(
@@ -66,7 +111,7 @@ void main() {
     final IOSWorkflow iosWorkflow = IOSWorkflow(
       platform: FakePlatform(operatingSystem: 'macos'),
       xcode: xcode,
-      featureFlags: TestFeatureFlags(isIOSEnabled: true),
+      featureFlags: TestFeatureFlags(),
     );
 
     // Make sure we're testing the right Xcode state.
@@ -74,5 +119,6 @@ void main() {
     expect(xcode.isSimctlInstalled, true);
     expect(iosWorkflow.canLaunchDevices, true);
     expect(iosWorkflow.canListDevices, true);
+    expect(iosWorkflow.canListEmulators, false);
   });
 }

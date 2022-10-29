@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import '../base/fingerprint.dart';
 import '../build_info.dart';
 import '../cache.dart';
@@ -30,9 +28,8 @@ Future<void> processPodsIfNeeded(
     paths: <String>[
       xcodeProject.xcodeProjectInfoFile.path,
       xcodeProject.podfile.path,
-      xcodeProject.generatedXcodePropertiesFile.path,
       globals.fs.path.join(
-        Cache.flutterRoot,
+        Cache.flutterRoot!,
         'packages',
         'flutter_tools',
         'bin',
@@ -43,11 +40,11 @@ Future<void> processPodsIfNeeded(
     logger: globals.logger,
   );
 
-  final bool didPodInstall = await globals.cocoaPods.processPods(
+  final bool didPodInstall = await globals.cocoaPods?.processPods(
     xcodeProject: xcodeProject,
     buildMode: buildMode,
     dependenciesChanged: !fingerprinter.doesFingerprintMatch(),
-  );
+  ) ?? false;
   if (didPodInstall) {
     fingerprinter.writeFingerprint();
   }

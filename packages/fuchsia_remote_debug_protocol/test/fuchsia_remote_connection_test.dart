@@ -4,9 +4,8 @@
 
 import 'package:fuchsia_remote_debug_protocol/fuchsia_remote_debug_protocol.dart';
 import 'package:test/fake.dart';
+import 'package:test/test.dart';
 import 'package:vm_service/vm_service.dart' as vms;
-
-import 'common.dart';
 
 void main() {
   group('FuchsiaRemoteConnection.connect', () {
@@ -189,7 +188,7 @@ void main() {
       expect(forwardedPorts[1].port, 1);
       expect(forwardedPorts[2].port, 2);
 
-      // VMs should be accessed via the alternate adddress given by
+      // VMs should be accessed via the alternate address given by
       // [fakePortForwardingFunction].
       expect(uriConnections[0],
         Uri(scheme:'ws', host:'[fe80::1:2%25eno2]', port:0, path:'/ws'));

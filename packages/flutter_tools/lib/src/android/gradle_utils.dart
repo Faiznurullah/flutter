@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:meta/meta.dart';
 
 import '../base/common.dart';
@@ -16,12 +14,34 @@ import '../base/utils.dart';
 import '../base/version.dart';
 import '../build_info.dart';
 import '../cache.dart';
-import '../globals_null_migrated.dart' as globals;
+import '../globals.dart' as globals;
 import '../project.dart';
 import '../reporting/reporting.dart';
 import 'android_sdk.dart';
 
-const String _defaultGradleVersion = '6.7';
+// These are the versions used in the project templates.
+//
+// In general, Flutter aims to default to the latest version.
+// However, this currently requires to migrate existing integration tests to the latest supported values.
+//
+// For more information about the latest version, check:
+// https://developer.android.com/studio/releases/gradle-plugin#updating-gradle
+// https://kotlinlang.org/docs/gradle.html#plugin-and-versions
+const String templateDefaultGradleVersion = '7.5';
+const String templateAndroidGradlePluginVersion = '7.2.0';
+const String templateDefaultGradleVersionForModule = '7.2.0';
+const String templateKotlinGradlePluginVersion = '1.7.10';
+
+// These versions should match the values in flutter.gradle (FlutterExtension).
+// The Flutter Gradle plugin is only applied to app projects, and modules that are built from source
+// using (include_flutter.groovy).
+// The remaining projects are: plugins, and modules compiled as AARs. In modules, the ephemeral directory
+// `.android` is always regenerated after flutter pub get, so new versions are picked up after a
+// Flutter upgrade.
+const String compileSdkVersion = '31';
+const String minSdkVersion = '16';
+const String targetSdkVersion = '31';
+const String ndkVersion = '21.4.7075529';
 
 final RegExp _androidPluginRegExp = RegExp(r'com\.android\.tools\.build:gradle:(\d+\.\d+\.\d+)');
 
@@ -29,11 +49,11 @@ final RegExp _androidPluginRegExp = RegExp(r'com\.android\.tools\.build:gradle:(
 /// or constructing a Gradle project.
 class GradleUtils {
   GradleUtils({
-    @required Platform platform,
-    @required Logger logger,
-    @required FileSystem fileSystem,
-    @required Cache cache,
-    @required OperatingSystemUtils operatingSystemUtils,
+    required Platform platform,
+    required Logger logger,
+    required FileSystem fileSystem,
+    required Cache cache,
+    required OperatingSystemUtils operatingSystemUtils,
   }) : _platform = platform,
        _logger = logger,
        _cache = cache,
@@ -111,31 +131,31 @@ distributionUrl=https\\://services.gradle.org/distributions/gradle-$gradleVersio
 String getGradleVersionForAndroidPlugin(Directory directory, Logger logger) {
   final File buildFile = directory.childFile('build.gradle');
   if (!buildFile.existsSync()) {
-    logger.printTrace("$buildFile doesn't exist, assuming AGP version: $_defaultGradleVersion");
-    return _defaultGradleVersion;
+    logger.printTrace("$buildFile doesn't exist, assuming Gradle version: $templateDefaultGradleVersion");
+    return templateDefaultGradleVersion;
   }
   final String buildFileContent = buildFile.readAsStringSync();
   final Iterable<Match> pluginMatches = _androidPluginRegExp.allMatches(buildFileContent);
   if (pluginMatches.isEmpty) {
-    logger.printTrace("$buildFile doesn't provide an AGP version, assuming AGP version: $_defaultGradleVersion");
-    return _defaultGradleVersion;
+    logger.printTrace("$buildFile doesn't provide an AGP version, assuming Gradle version: $templateDefaultGradleVersion");
+    return templateDefaultGradleVersion;
   }
-  final String androidPluginVersion = pluginMatches.first.group(1);
+  final String? androidPluginVersion = pluginMatches.first.group(1);
   logger.printTrace('$buildFile provides AGP version: $androidPluginVersion');
-  return getGradleVersionFor(androidPluginVersion);
+  return getGradleVersionFor(androidPluginVersion ?? 'unknown');
 }
 
 /// Returns true if [targetVersion] is within the range [min] and [max] inclusive.
 bool _isWithinVersionRange(
   String targetVersion, {
-  @required String min,
-  @required String max,
+  required String min,
+  required String max,
 }) {
   assert(min != null);
   assert(max != null);
-  final Version parsedTargetVersion = Version.parse(targetVersion);
-  final Version minVersion = Version.parse(min);
-  final Version maxVersion = Version.parse(max);
+  final Version? parsedTargetVersion = Version.parse(targetVersion);
+  final Version? minVersion = Version.parse(min);
+  final Version? maxVersion = Version.parse(max);
   return minVersion != null &&
       maxVersion != null &&
       parsedTargetVersion != null &&
@@ -184,6 +204,9 @@ String getGradleVersionFor(String androidPluginVersion) {
   if (_isWithinVersionRange(androidPluginVersion, min: '4.0.0', max: '4.1.0')) {
     return '6.7';
   }
+  if (_isWithinVersionRange(androidPluginVersion, min: '7.0', max: '7.5')) {
+    return '7.5';
+  }
   throwToolExit('Unsupported Android Plugin version: $androidPluginVersion.');
 }
 
@@ -193,8 +216,8 @@ String getGradleVersionFor(String androidPluginVersion) {
 /// If [requireAndroidSdk] is true (the default) and no Android SDK is found,
 /// this will fail with a [ToolExit].
 void updateLocalProperties({
-  @required FlutterProject project,
-  BuildInfo buildInfo,
+  required FlutterProject project,
+  BuildInfo? buildInfo,
   bool requireAndroidSdk = true,
 }) {
   if (requireAndroidSdk && globals.androidSdk == null) {
@@ -211,7 +234,7 @@ void updateLocalProperties({
     changed = true;
   }
 
-  void changeIfNecessary(String key, String value) {
+  void changeIfNecessary(String key, String? value) {
     if (settings.values[key] == value) {
       return;
     }
@@ -223,21 +246,21 @@ void updateLocalProperties({
     changed = true;
   }
 
-  final AndroidSdk androidSdk = globals.androidSdk;
+  final AndroidSdk? androidSdk = globals.androidSdk;
   if (androidSdk != null) {
     changeIfNecessary('sdk.dir', globals.fsUtils.escapePath(androidSdk.directory.path));
   }
 
-  changeIfNecessary('flutter.sdk', globals.fsUtils.escapePath(Cache.flutterRoot));
+  changeIfNecessary('flutter.sdk', globals.fsUtils.escapePath(Cache.flutterRoot!));
   if (buildInfo != null) {
     changeIfNecessary('flutter.buildMode', buildInfo.modeName);
-    final String buildName = validatedBuildNameForPlatform(
+    final String? buildName = validatedBuildNameForPlatform(
       TargetPlatform.android_arm,
       buildInfo.buildName ?? project.manifest.buildName,
       globals.logger,
     );
     changeIfNecessary('flutter.versionName', buildName);
-    final String buildNumber = validatedBuildNumberForPlatform(
+    final String? buildNumber = validatedBuildNumberForPlatform(
       TargetPlatform.android_arm,
       buildInfo.buildNumber ?? project.manifest.buildNumber,
       globals.logger,
@@ -255,7 +278,7 @@ void updateLocalProperties({
 /// Writes the path to the Android SDK, if known.
 void writeLocalProperties(File properties) {
   final SettingsFile settings = SettingsFile();
-  final AndroidSdk androidSdk = globals.androidSdk;
+  final AndroidSdk? androidSdk = globals.androidSdk;
   if (androidSdk != null) {
     settings.values['sdk.dir'] = globals.fsUtils.escapePath(androidSdk.directory.path);
   }

@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// This file is run as part of a reduced test set in CI on Mac and Windows
+// machines.
+@Tags(<String>['reduced-test-set'])
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -138,7 +142,6 @@ void main() {
             // the nav bar position it horizontally.
             middle: Align(
               key: middleBox,
-              alignment: Alignment.center,
               widthFactor: 1.0,
               child: const Text('Title'),
             ),
@@ -527,6 +530,52 @@ void main() {
       tester.renderObject<RenderAnimatedOpacity>(find.widgetWithText(AnimatedOpacity, 'Title')).opacity.value,
       0.0,
     );
+  });
+
+  testWidgets('User specified middle is only visible when sliver is collapsed if alwaysShowMiddle is false', (WidgetTester tester) async {
+    final ScrollController scrollController = ScrollController();
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: const <Widget>[
+              CupertinoSliverNavigationBar(
+                largeTitle: Text('Large'),
+                middle: Text('Middle'),
+                alwaysShowMiddle: false,
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 1200.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(scrollController.offset, 0.0);
+    expect(find.text('Middle'), findsOneWidget);
+
+    // Initially (in expanded state) middle widget is not visible.
+    RenderAnimatedOpacity middleOpacity = tester.element(find.text('Middle')).findAncestorRenderObjectOfType<RenderAnimatedOpacity>()!;
+    expect(middleOpacity.opacity.value, 0.0);
+
+    scrollController.jumpTo(600.0);
+    await tester.pumpAndSettle();
+
+    // Middle widget is visible when nav bar is collapsed.
+    middleOpacity = tester.element(find.text('Middle')).findAncestorRenderObjectOfType<RenderAnimatedOpacity>()!;
+    expect(middleOpacity.opacity.value, 1.0);
+
+    scrollController.jumpTo(0.0);
+    await tester.pumpAndSettle();
+
+    // Middle widget is not visible when nav bar is again expanded.
+    middleOpacity = tester.element(find.text('Middle')).findAncestorRenderObjectOfType<RenderAnimatedOpacity>()!;
+    expect(middleOpacity.opacity.value, 0.0);
   });
 
   testWidgets('Small title can be overridden', (WidgetTester tester) async {
@@ -1185,8 +1234,6 @@ void main() {
             child: CustomScrollView(
               slivers: <Widget>[
                 CupertinoSliverNavigationBar(
-                  automaticallyImplyLeading: true,
-                  automaticallyImplyTitle: true,
                   previousPageTitle: 'previous title',
                 ),
               ],
@@ -1279,7 +1326,6 @@ void main() {
                 const CupertinoSliverNavigationBar(
                   trailing: trailingText,
                   largeTitle: titleText,
-                  stretch: false,
                 ),
                 SliverToBoxAdapter(
                   child: Container(

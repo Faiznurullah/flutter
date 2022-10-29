@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:file/file.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/platform_plugins.dart';
-
 
 import '../src/common.dart';
 
@@ -27,6 +24,40 @@ void main() {
       '.pub_cache/plugin_a/android/src/main/java/com/company/PluginA.java '
       'or .pub_cache/plugin_a/android/src/main/kotlin/com/company/PluginA.kt'
     ));
+  });
+
+  testWithoutContext('AndroidPlugin does not validate the main class for Dart-only plugins', () {
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final AndroidPlugin androidPlugin = AndroidPlugin(
+      name: 'pluginA',
+      dartPluginClass: 'PluginA',
+      pluginPath: '.pub_cache/plugin_a',
+      fileSystem: fileSystem,
+    );
+
+    expect(androidPlugin.toMap(), <String, Object>{
+      'name': 'pluginA',
+      'dartPluginClass': 'PluginA',
+      'supportsEmbeddingV1': false,
+      'supportsEmbeddingV2': false,
+    });
+  });
+
+  testWithoutContext('AndroidPlugin does not validate the main class for default_package', () {
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final AndroidPlugin androidPlugin = AndroidPlugin(
+      name: 'pluginA',
+      defaultPackage: 'plugin_a_android',
+      pluginPath: '.pub_cache/plugin_a',
+      fileSystem: fileSystem,
+    );
+
+    expect(androidPlugin.toMap(), <String, Object>{
+      'name': 'pluginA',
+      'default_package': 'plugin_a_android',
+      'supportsEmbeddingV1': false,
+      'supportsEmbeddingV2': false,
+    });
   });
 
   testWithoutContext('AndroidPlugin parses embedding version 2 from the Java search path', () {

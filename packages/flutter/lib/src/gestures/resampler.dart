@@ -6,6 +6,8 @@ import 'dart:collection';
 
 import 'events.dart';
 
+export 'events.dart' show PointerEvent;
+
 /// A callback used by [PointerEventResampler.sample] and
 /// [PointerEventResampler.stop] to process a resampled `event`.
 typedef HandleEventCallback = void Function(PointerEvent event);
@@ -169,9 +171,9 @@ class PointerEventResampler {
   }
 
   void _dequeueAndSampleNonHoverOrMovePointerEventsUntil(
-      Duration sampleTime,
-      Duration nextSampleTime,
-      HandleEventCallback callback,
+    Duration sampleTime,
+    Duration nextSampleTime,
+    HandleEventCallback callback,
   ) {
     Duration endTime = sampleTime;
     // Scan queued events to determine end time.
@@ -240,7 +242,7 @@ class PointerEventResampler {
         // Add synthetics `move` or `hover` event if position has changed.
         // Note: Devices without `hover` events are expected to always have
         // `add` and `down` events with the same position and this logic will
-        // therefor never produce `hover` events.
+        // therefore never produce `hover` events.
         if (position != _position) {
           final Offset delta = position - _position;
           callback(_toMoveOrHoverEvent(event, position, delta,
@@ -260,8 +262,8 @@ class PointerEventResampler {
   }
 
   void _samplePointerPosition(
-      Duration sampleTime,
-      HandleEventCallback callback,
+    Duration sampleTime,
+    HandleEventCallback callback,
   ) {
     // Position at `sampleTime`.
     final Offset position = _positionAt(sampleTime);

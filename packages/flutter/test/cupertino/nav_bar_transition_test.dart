@@ -3,8 +3,17 @@
 // found in the LICENSE file.
 
 @TestOn('!chrome')
+// TODO(gspencergoog): Remove this tag once this test's state leaks/test
+// dependencies have been fixed.
+// https://github.com/flutter/flutter/issues/85160
+// Fails with "flutter test --test-randomize-ordering-seed=456"
+@Tags(<String>['no-shuffle'])
+
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> startTransitionBetween(
@@ -111,7 +120,7 @@ void checkBackgroundBoxHeight(WidgetTester tester, double height) {
 
 void checkOpacity(WidgetTester tester, Finder finder, double opacity) {
   expect(
-    tester.renderObject<RenderAnimatedOpacity>(
+    tester.firstRenderObject<RenderAnimatedOpacity>(
       find.ancestor(
         of: finder,
         matching: find.byType(FadeTransition),
@@ -163,6 +172,27 @@ void main() {
       tester.getTopLeft(flying(tester, find.text('Page 1')).last),
       const Offset(362.8046875, 13.5),
     );
+  });
+
+  testWidgets('Bottom middle never changes size during the animation', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1080.0 / 2.75, 600));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(const Size(800.0, 600.0));
+    });
+
+    await startTransitionBetween(
+      tester,
+      fromTitle: 'Page 1',
+    );
+
+    final Size size = tester.getSize(find.text('Page 1'));
+
+    for (int i = 0; i < 150; i++) {
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(flying(tester, find.text('Page 1')), findsNWidgets(2));
+      expect(tester.getSize(flying(tester, find.text('Page 1')).first), size);
+      expect(tester.getSize(flying(tester, find.text('Page 1')).last), size);
+    }
   });
 
   testWidgets('Bottom middle and top back label transitions their font', (WidgetTester tester) async {
@@ -414,6 +444,26 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('DartPerformanceMode is latency mid-animation', (WidgetTester tester) async {
+    DartPerformanceMode? mode;
+
+    // before the animation starts, no requests are active.
+    mode = SchedulerBinding.instance.debugGetRequestedPerformanceMode();
+    expect(mode, isNull);
+
+    await startTransitionBetween(tester, fromTitle: 'Page 1');
+
+    // mid-transition, latency mode is expected.
+    await tester.pump(const Duration(milliseconds: 50));
+    mode = SchedulerBinding.instance.debugGetRequestedPerformanceMode();
+    expect(mode, equals(DartPerformanceMode.latency));
+
+    // end of transitio, go back to no requests active.
+    await tester.pump(const Duration(milliseconds: 500));
+    mode = SchedulerBinding.instance.debugGetRequestedPerformanceMode();
+    expect(mode, isNull);
   });
 
   testWidgets('Multiple nav bars tags do not conflict if in different navigators', (WidgetTester tester) async {
@@ -970,6 +1020,30 @@ void main() {
       tester.getTopLeft(flying(tester, find.text('Page 2'))),
       const Offset(439.7678077220917, 13.5),
     );
+  });
+
+  testWidgets('Top middle never changes size during the animation', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1080.0 / 2.75, 600));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(const Size(800.0, 600.0));
+    });
+
+    await startTransitionBetween(
+      tester,
+      toTitle: 'Page 2',
+    );
+
+    Size? previousSize;
+
+    for (int i = 0; i < 150; i++) {
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(flying(tester, find.text('Page 2')), findsOneWidget);
+      final Size size = tester.getSize(flying(tester, find.text('Page 2')));
+      if (previousSize != null) {
+        expect(size, previousSize);
+      }
+      previousSize = size;
+    }
   });
 
   testWidgets('Top middle fades in and slides in from the left in RTL', (WidgetTester tester) async {

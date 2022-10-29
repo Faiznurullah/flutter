@@ -12,7 +12,7 @@ import 'future_data_handler.dart';
 import 'page.dart';
 
 class NestedViewEventPage extends PageWidget {
-  const NestedViewEventPage({Key key})
+  const NestedViewEventPage({Key? key})
       : super('Nested View Event Tests', const ValueKey<String>('NestedViewEventTile'), key: key);
 
   @override
@@ -20,7 +20,7 @@ class NestedViewEventPage extends PageWidget {
 }
 
 class NestedViewEventBody extends StatefulWidget {
-  const NestedViewEventBody({Key key}) : super(key: key);
+  const NestedViewEventBody({super.key});
 
   @override
   State<NestedViewEventBody> createState() => NestedViewEventBodyState();
@@ -33,12 +33,13 @@ enum _LastTestStatus {
 }
 
 class NestedViewEventBodyState extends State<NestedViewEventBody> {
-  MethodChannel viewChannel;
+  MethodChannel? viewChannel;
   _LastTestStatus _lastTestStatus = _LastTestStatus.pending;
-  String lastError;
-  int id;
+  String? lastError;
+  int? id;
   int nestedViewClickCount = 0;
   bool showPlatformView = true;
+  bool useHybridComposition = false;
 
   @override
   Widget build(BuildContext context) {
@@ -55,39 +56,63 @@ class NestedViewEventBodyState extends State<NestedViewEventBody> {
                   key: const ValueKey<String>('PlatformView'),
                   viewType: 'simple_view',
                   onPlatformViewCreated: onPlatformViewCreated,
+                  useHybridComposition: useHybridComposition,
                 ) : null,
           ),
           if (_lastTestStatus != _LastTestStatus.pending) _statusWidget(),
           if (viewChannel != null) ... <Widget>[
-            ElevatedButton(
-              key: const ValueKey<String>('ShowAlertDialog'),
-              onPressed: onShowAlertDialogPressed,
-              child: const Text('SHOW ALERT DIALOG'),
-            ),
-            ElevatedButton(
-              key: const ValueKey<String>('TogglePlatformView'),
-              onPressed: onTogglePlatformView,
-              child: const Text('TOGGLE PLATFORM VIEW'),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: ElevatedButton(
+                    key: const ValueKey<String>('ShowAlertDialog'),
+                    onPressed: onShowAlertDialogPressed,
+                    child: const Text('SHOW ALERT DIALOG'),
+                  ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    key: const ValueKey<String>('TogglePlatformView'),
+                    onPressed: onTogglePlatformView,
+                    child: const Text('TOGGLE PLATFORM VIEW'),
+                  ),
+                ),
+              ],
             ),
             Row(
               children: <Widget>[
-                ElevatedButton(
-                  key: const ValueKey<String>('AddChildView'),
-                  onPressed: onChildViewPressed,
-                  child: const Text('ADD CHILD VIEW'),
-                ),
-                ElevatedButton(
-                  key: const ValueKey<String>('TapChildView'),
-                  onPressed: onTapChildViewPressed,
-                  child: const Text('TAP CHILD VIEW'),
-                ),
-                if (nestedViewClickCount > 0)
-                  Text(
-                      'Click count: $nestedViewClickCount',
-                      key: const ValueKey<String>('NestedViewClickCount'),
+                Expanded(
+                  child: ElevatedButton(
+                    key: const ValueKey<String>('ToggleHybridComposition'),
+                    child: const Text('TOGGLE HC'),
+                    onPressed: () {
+                      setState(() {
+                        useHybridComposition = !useHybridComposition;
+                      });
+                    },
                   ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    key: const ValueKey<String>('AddChildView'),
+                    onPressed: onChildViewPressed,
+                    child: const Text('ADD CHILD VIEW'),
+                  ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    key: const ValueKey<String>('TapChildView'),
+                    onPressed: onTapChildViewPressed,
+                    child: const Text('TAP CHILD VIEW'),
+                  ),
+                ),
               ],
             ),
+            if (nestedViewClickCount > 0)
+              Text(
+                'Click count: $nestedViewClickCount',
+                key: const ValueKey<String>('NestedViewClickCount'),
+              ),
           ],
         ],
       ),
@@ -96,7 +121,7 @@ class NestedViewEventBodyState extends State<NestedViewEventBody> {
 
   Widget _statusWidget() {
     assert(_lastTestStatus != _LastTestStatus.pending);
-    final String message = _lastTestStatus == _LastTestStatus.success ? 'Success' : lastError;
+    final String message = _lastTestStatus == _LastTestStatus.success ? 'Success' : lastError!;
     return Container(
       color: _lastTestStatus == _LastTestStatus.success ? Colors.green : Colors.red,
       child: Text(
@@ -116,7 +141,7 @@ class NestedViewEventBodyState extends State<NestedViewEventBody> {
       });
     }
     try {
-      await viewChannel.invokeMethod<void>('showAndHideAlertDialog');
+      await viewChannel!.invokeMethod<void>('showAndHideAlertDialog');
       setState(() {
         _lastTestStatus = _LastTestStatus.success;
       });
@@ -136,7 +161,7 @@ class NestedViewEventBodyState extends State<NestedViewEventBody> {
 
   Future<void> onChildViewPressed() async {
     try {
-      await viewChannel.invokeMethod<void>('addChildViewAndWaitForClick');
+      await viewChannel!.invokeMethod<void>('addChildViewAndWaitForClick');
       setState(() {
         nestedViewClickCount++;
       });
@@ -167,6 +192,6 @@ class NestedViewEventBodyState extends State<NestedViewEventBody> {
       viewChannel = MethodChannel('simple_view/$id');
     });
     driverDataHandler.registerHandler('hierarchy')
-      .complete(() => channel.invokeMethod<String>('getViewHierarchy'));
+      .complete(() async => (await channel.invokeMethod<String>('getViewHierarchy'))!);
   }
 }

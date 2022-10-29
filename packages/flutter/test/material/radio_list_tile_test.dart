@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../rendering/mock_canvas.dart';
 import '../widgets/semantics_tester.dart';
+import 'feedback_tester.dart';
 
 Widget wrap({Widget? child}) {
   return MediaQuery(
@@ -682,7 +681,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(Material), paints..path(color: tileColor));
+    expect(find.byType(Material), paints..rect(color: tileColor));
   });
 
   testWidgets('RadioListTile respects selectedTileColor', (WidgetTester tester) async {
@@ -703,7 +702,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(Material), paints..path(color: selectedTileColor));
+    expect(find.byType(Material), paints..rect(color: selectedTileColor));
   });
 
   testWidgets('RadioListTile selected item text Color', (WidgetTester tester) async {
@@ -711,10 +710,14 @@ void main() {
 
     const Color activeColor = Color(0xff00ff00);
 
-    Widget buildFrame({ Color? activeColor, Color? toggleableActiveColor }) {
+    Widget buildFrame({ Color? activeColor, Color? fillColor }) {
       return MaterialApp(
         theme: ThemeData.light().copyWith(
-          toggleableActiveColor: toggleableActiveColor,
+          radioTheme: RadioThemeData(
+            fillColor: MaterialStateProperty.resolveWith<Color?>((Set<MaterialState> states) {
+              return states.contains(MaterialState.selected) ? fillColor : null;
+            }),
+          ),
         ),
         home: Scaffold(
           body: Center(
@@ -735,10 +738,102 @@ void main() {
       return tester.renderObject<RenderParagraph>(find.text(text)).text.style?.color;
     }
 
-    await tester.pumpWidget(buildFrame(toggleableActiveColor: activeColor));
+    await tester.pumpWidget(buildFrame(fillColor: activeColor));
     expect(textColor('title'), activeColor);
 
     await tester.pumpWidget(buildFrame(activeColor: activeColor));
     expect(textColor('title'), activeColor);
+  });
+
+  testWidgets('RadioListTile respects visualDensity', (WidgetTester tester) async {
+    const Key key = Key('test');
+    Future<void> buildTest(VisualDensity visualDensity) async {
+      return tester.pumpWidget(
+        wrap(
+          child: Center(
+            child: RadioListTile<bool>(
+              key: key,
+              value: false,
+              groupValue: true,
+              onChanged: (bool? value) {},
+              autofocus: true,
+              visualDensity: visualDensity,
+            ),
+          ),
+        ),
+      );
+    }
+
+    await buildTest(VisualDensity.standard);
+    final RenderBox box = tester.renderObject(find.byKey(key));
+    await tester.pumpAndSettle();
+    expect(box.size, equals(const Size(800, 56)));
+  });
+
+  testWidgets('RadioListTile respects focusNode', (WidgetTester tester) async {
+    final GlobalKey childKey = GlobalKey();
+    await tester.pumpWidget(
+      wrap(
+        child: Center(
+          child: RadioListTile<bool>(
+            value: false,
+            groupValue: true,
+            title: Text('A', key: childKey),
+            onChanged: (bool? value) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    final FocusNode tileNode = Focus.of(childKey.currentContext!);
+    tileNode.requestFocus();
+    await tester.pump(); // Let the focus take effect.
+    expect(Focus.of(childKey.currentContext!).hasPrimaryFocus, isTrue);
+    expect(tileNode.hasPrimaryFocus, isTrue);
+  });
+
+  group('feedback', () {
+    late FeedbackTester feedback;
+
+    setUp(() {
+      feedback = FeedbackTester();
+    });
+
+    tearDown(() {
+      feedback.dispose();
+    });
+
+    testWidgets('RadioListTile respects enableFeedback', (WidgetTester tester) async {
+      const Key key = Key('test');
+      Future<void> buildTest(bool enableFeedback) async {
+        return tester.pumpWidget(
+          wrap(
+            child: Center(
+              child: RadioListTile<bool>(
+                key: key,
+                value: false,
+                groupValue: true,
+                selected: true,
+                onChanged: (bool? value) {},
+                enableFeedback: enableFeedback,
+              ),
+            ),
+          ),
+        );
+      }
+
+      await buildTest(false);
+      await tester.tap(find.byKey(key));
+      await tester.pump(const Duration(seconds: 1));
+      expect(feedback.clickSoundCount, 0);
+      expect(feedback.hapticCount, 0);
+
+      await buildTest(true);
+      await tester.tap(find.byKey(key));
+      await tester.pump(const Duration(seconds: 1));
+      expect(feedback.clickSoundCount, 1);
+      expect(feedback.hapticCount, 0);
+    });
   });
 }

@@ -9,7 +9,9 @@
 // Edit the template dev/tools/gen_keycodes/data/keyboard_maps.tmpl instead.
 // See dev/tools/gen_keycodes/README.md for more information.
 
-import 'keyboard_key.dart';
+import 'keyboard_key.g.dart';
+
+export 'keyboard_key.g.dart' show LogicalKeyboardKey, PhysicalKeyboardKey;
 
 /// Maps Android-specific key codes to the matching [LogicalKeyboardKey].
 const Map<int, LogicalKeyboardKey> kAndroidToLogicalKey = <int, LogicalKeyboardKey>{
@@ -76,6 +78,15 @@ const Map<int, PhysicalKeyboardKey> kIosToPhysicalKey = <int, PhysicalKeyboardKe
 @@@IOS_SCAN_CODE_MAP@@@
 };
 
+/// Maps iOS specific string values of nonvisible keys to logical keys
+///
+/// Some unprintable keys on iOS has literal names on their key label, such as
+/// "UIKeyInputEscape". See:
+/// https://developer.apple.com/documentation/uikit/uikeycommand/input_strings_for_special_keys?language=objc
+const Map<String, LogicalKeyboardKey> kIosSpecialLogicalMap = <String, LogicalKeyboardKey>{
+@@@IOS_SPECIAL_MAP@@@
+};
+
 /// A map of iOS key codes which have printable representations, but appear
 /// on the number pad. Used to provide different key objects for keys like
 /// KEY_EQUALS and NUMPAD_EQUALS.
@@ -140,7 +151,7 @@ const Map<String, LogicalKeyboardKey> kWebNumPadMap = <String, LogicalKeyboardKe
 };
 
 /// A map of Web KeyboardEvent keys which needs to be decided based on location,
-/// typically for numpad kyes and modifier keys. Used to provide different key
+/// typically for numpad keys and modifier keys. Used to provide different key
 /// objects for keys like KEY_EQUALS and NUMPAD_EQUALS.
 const Map<String, List<LogicalKeyboardKey?>> kWebLocationMap = <String, List<LogicalKeyboardKey?>>{
 @@@WEB_LOCATION_MAP@@@

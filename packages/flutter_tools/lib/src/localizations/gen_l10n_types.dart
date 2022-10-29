@@ -124,6 +124,9 @@ class L10nException implements Exception {
   L10nException(this.message);
 
   final String message;
+
+  @override
+  String toString() => message;
 }
 
 // One optional named parameter to be used by a NumberFormat.
@@ -193,7 +196,8 @@ class Placeholder {
       example = _stringAttribute(resourceId, name, attributes, 'example'),
       type = _stringAttribute(resourceId, name, attributes, 'type') ?? 'Object',
       format = _stringAttribute(resourceId, name, attributes, 'format'),
-      optionalParameters = _optionalParameters(resourceId, name, attributes);
+      optionalParameters = _optionalParameters(resourceId, name, attributes),
+      isCustomDateFormat = _boolAttribute(resourceId, name, attributes, 'isCustomDateFormat');
 
   final String resourceId;
   final String name;
@@ -201,6 +205,7 @@ class Placeholder {
   final String? type;
   final String? format;
   final List<OptionalParameter> optionalParameters;
+  final bool? isCustomDateFormat;
 
   bool get requiresFormatting => <String>['DateTime', 'double', 'num'].contains(type) || (type == 'int' && format != null);
   bool get isNumber => <String>['double', 'int', 'num'].contains(type);
@@ -228,6 +233,25 @@ class Placeholder {
     return value;
   }
 
+  static bool? _boolAttribute(
+      String resourceId,
+      String name,
+      Map<String, Object?> attributes,
+      String attributeName,
+      ) {
+    final Object? value = attributes[attributeName];
+    if (value == null) {
+      return null;
+    }
+    if (value != 'true' && value != 'false') {
+      throw L10nException(
+        'The "$attributeName" value of the "$name" placeholder in message $resourceId '
+            'must be a boolean value.',
+      );
+    }
+    return value == 'true';
+  }
+
   static List<OptionalParameter> _optionalParameters(
     String resourceId,
     String name,
@@ -237,14 +261,14 @@ class Placeholder {
     if (value == null) {
       return <OptionalParameter>[];
     }
-    if (value is! Map<String, Object>) {
+    if (value is! Map<String, Object?>) {
       throw L10nException(
         'The "optionalParameters" value of the "$name" placeholder in message '
         '$resourceId is not a properly formatted Map. Ensure that it is a map '
         'with keys that are strings.'
       );
     }
-    final Map<String, Object> optionalParameterMap = value;
+    final Map<String, Object?> optionalParameterMap = value;
     return optionalParameterMap.keys.map<OptionalParameter>((String parameterName) {
       return OptionalParameter(parameterName, optionalParameterMap[parameterName]!);
     }).toList();
@@ -273,17 +297,21 @@ class Message {
       value = _value(bundle, resourceId),
       description = _description(bundle, resourceId, isResourceAttributeRequired),
       placeholders = _placeholders(bundle, resourceId, isResourceAttributeRequired),
-      _pluralMatch = _pluralRE.firstMatch(_value(bundle, resourceId));
+      _pluralMatch = _pluralRE.firstMatch(_value(bundle, resourceId)),
+      _selectMatch = _selectRE.firstMatch(_value(bundle, resourceId));
 
   static final RegExp _pluralRE = RegExp(r'\s*\{([\w\s,]*),\s*plural\s*,');
+  static final RegExp _selectRE = RegExp(r'\s*\{([\w\s,]*),\s*select\s*,');
 
   final String resourceId;
   final String value;
   final String? description;
   final List<Placeholder> placeholders;
   final RegExpMatch? _pluralMatch;
+  final RegExpMatch? _selectMatch;
 
   bool get isPlural => _pluralMatch != null && _pluralMatch!.groupCount == 1;
+  bool get isSelect => _selectMatch != null && _selectMatch!.groupCount == 1;
 
   bool get placeholdersRequireFormatting => placeholders.any((Placeholder p) => p.requiresFormatting);
 
@@ -331,13 +359,21 @@ class Message {
       );
     }
 
-    final RegExpMatch? pluralRegExp = _pluralRE.firstMatch(_value(bundle, resourceId));
-    final bool isPlural = pluralRegExp != null && pluralRegExp.groupCount == 1;
-    if (attributes == null && isPlural) {
-      throw L10nException(
-        'Resource attribute "@$resourceId" was not found. Please '
-        'ensure that plural resources have a corresponding @resource.'
-      );
+    if (attributes == null) {
+
+      void throwEmptyAttributes(final RegExp regExp, final String type) {
+        final RegExpMatch? match = regExp.firstMatch(_value(bundle, resourceId));
+        final bool isMatch = match != null && match.groupCount == 1;
+        if (isMatch) {
+          throw L10nException(
+            'Resource attribute "@$resourceId" was not found. Please '
+            'ensure that $type resources have a corresponding @resource.'
+          );
+        }
+      }
+
+      throwEmptyAttributes(_pluralRE, 'plural');
+      throwEmptyAttributes(_selectRE, 'select');
     }
 
     return attributes as Map<String, Object?>?;
@@ -409,7 +445,7 @@ class AppResourceBundle {
     } on FormatException catch (e) {
       throw L10nException(
         'The arb file ${file.path} has the following formatting issue: \n'
-        '${e.toString()}',
+        '$e',
       );
     }
 

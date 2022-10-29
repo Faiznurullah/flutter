@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(gspencergoog): Remove this tag once this test's state leaks/test
+// dependencies have been fixed.
+// https://github.com/flutter/flutter/issues/85160
+// Fails with "flutter test --test-randomize-ordering-seed=1000"
+@Tags(<String>['no-shuffle'])
+
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -19,8 +25,9 @@ class TestDataSource extends DataTableSource {
   int get generation => _generation;
   int _generation = 0;
   set generation(int value) {
-    if (_generation == value)
+    if (_generation == value) {
       return;
+    }
     _generation = value;
     notifyListeners();
   }
@@ -28,7 +35,7 @@ class TestDataSource extends DataTableSource {
   final Set<int> _selectedRows = <int>{};
 
   void _handleSelected(int index, bool? selected) {
-    if (selected == true) {
+    if (selected ?? false) {
       _selectedRows.add(index);
     } else {
       _selectedRows.remove(index);
@@ -63,8 +70,7 @@ class TestDataSource extends DataTableSource {
 }
 
 void main() {
-  final TestWidgetsFlutterBinding binding =
-      TestWidgetsFlutterBinding.ensureInitialized() as TestWidgetsFlutterBinding;
+  final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('PaginatedDataTable paging', (WidgetTester tester) async {
     final TestDataSource source = TestDataSource();
@@ -219,7 +225,9 @@ void main() {
     // the column overflows because we're forcing it to 600 pixels high
     final dynamic exception = tester.takeException();
     expect(exception, isFlutterError);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.level, DiagnosticLevel.summary);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.toString(), startsWith('A RenderFlex overflowed by '));
 
     expect(find.text('Gingerbread (0)'), findsOneWidget);
@@ -294,7 +302,6 @@ void main() {
         header: header != null ? Text(header) : null,
         actions: actions,
         source: TestDataSource(allowSelection: true),
-        showCheckboxColumn: true,
         columns: const <DataColumn>[
           DataColumn(label: Text('Name')),
           DataColumn(label: Text('Calories'), numeric: true),
@@ -344,7 +351,9 @@ void main() {
     // the column overflows because we're forcing it to 600 pixels high
     final dynamic exception = tester.takeException();
     expect(exception, isFlutterError);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.level, DiagnosticLevel.summary);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.toString(), contains('A RenderFlex overflowed by'));
 
     expect(find.text('Rows per page:'), findsOneWidget);
@@ -390,6 +399,7 @@ void main() {
     expect(find.text('Rows per page:'), findsOneWidget);
     expect(tester.getTopLeft(find.text('Rows per page:')).dx, 18.0); // 14 padding in the footer row, 4 padding from the card
   });
+
   testWidgets('PaginatedDataTable custom row height', (WidgetTester tester) async {
     final TestDataSource source = TestDataSource();
 
@@ -472,19 +482,19 @@ void main() {
   });
 
   testWidgets('PaginatedDataTable custom horizontal padding - checkbox', (WidgetTester tester) async {
-    const double _defaultHorizontalMargin = 24.0;
-    const double _defaultColumnSpacing = 56.0;
-    const double _customHorizontalMargin = 10.0;
-    const double _customColumnSpacing = 15.0;
+    const double defaultHorizontalMargin = 24.0;
+    const double defaultColumnSpacing = 56.0;
+    const double customHorizontalMargin = 10.0;
+    const double customColumnSpacing = 15.0;
 
-    const double _width = 400;
-    const double _height = 400;
+    const double width = 400;
+    const double height = 400;
 
     final Size originalSize = binding.renderView.size;
 
     // Ensure the containing Card is small enough that we don't expand too
     // much, resulting in our custom margin being ignored.
-    await binding.setSurfaceSize(const Size(_width, _height));
+    await binding.setSurfaceSize(const Size(width, height));
 
     final TestDataSource source = TestDataSource(allowSelection: true);
     Finder cellContent;
@@ -515,11 +525,11 @@ void main() {
     padding = find.ancestor(of: checkbox, matching: find.byType(Padding)).first;
     expect(
       tester.getRect(checkbox).left - tester.getRect(padding).left,
-      _defaultHorizontalMargin,
+      defaultHorizontalMargin,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(checkbox).right,
-      _defaultHorizontalMargin / 2,
+      defaultHorizontalMargin / 2,
     );
 
     // default first column padding
@@ -527,11 +537,11 @@ void main() {
     cellContent = find.widgetWithText(Align, 'Frozen yogurt (0)'); // DataTable wraps its DataCells in an Align widget
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultHorizontalMargin / 2,
+      defaultHorizontalMargin / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
 
     // default middle column padding
@@ -539,11 +549,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '159');
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
 
     // default last column padding
@@ -551,11 +561,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '0').first;
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultHorizontalMargin,
+      defaultHorizontalMargin,
     );
 
     // CUSTOM VALUES
@@ -576,8 +586,8 @@ void main() {
             DataColumn(label: Text('Calories'), numeric: true),
             DataColumn(label: Text('Generation')),
           ],
-          horizontalMargin: _customHorizontalMargin,
-          columnSpacing: _customColumnSpacing,
+          horizontalMargin: customHorizontalMargin,
+          columnSpacing: customColumnSpacing,
         ),
       ),
     ));
@@ -587,11 +597,11 @@ void main() {
     padding = find.ancestor(of: checkbox, matching: find.byType(Padding)).first;
     expect(
       tester.getRect(checkbox).left - tester.getRect(padding).left,
-      _customHorizontalMargin,
+      customHorizontalMargin,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(checkbox).right,
-      _customHorizontalMargin / 2,
+      customHorizontalMargin / 2,
     );
 
     // custom first column padding
@@ -599,11 +609,11 @@ void main() {
     cellContent = find.widgetWithText(Align, 'Frozen yogurt (0)'); // DataTable wraps its DataCells in an Align widget
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customHorizontalMargin / 2,
+      customHorizontalMargin / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
 
     // custom middle column padding
@@ -611,11 +621,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '159');
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
 
     // custom last column padding
@@ -623,11 +633,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '0').first;
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customHorizontalMargin,
+      customHorizontalMargin,
     );
 
     // Reset the surface size.
@@ -635,10 +645,10 @@ void main() {
   });
 
   testWidgets('PaginatedDataTable custom horizontal padding - no checkbox', (WidgetTester tester) async {
-    const double _defaultHorizontalMargin = 24.0;
-    const double _defaultColumnSpacing = 56.0;
-    const double _customHorizontalMargin = 10.0;
-    const double _customColumnSpacing = 15.0;
+    const double defaultHorizontalMargin = 24.0;
+    const double defaultColumnSpacing = 56.0;
+    const double customHorizontalMargin = 10.0;
+    const double customColumnSpacing = 15.0;
     final TestDataSource source = TestDataSource();
     Finder cellContent;
     Finder padding;
@@ -666,11 +676,11 @@ void main() {
     cellContent = find.widgetWithText(Align, 'Frozen yogurt (0)'); // DataTable wraps its DataCells in an Align widget
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultHorizontalMargin,
+      defaultHorizontalMargin,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
 
     // default middle column padding
@@ -678,11 +688,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '159');
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
 
     // default last column padding
@@ -690,11 +700,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '0').first;
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _defaultColumnSpacing / 2,
+      defaultColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _defaultHorizontalMargin,
+      defaultHorizontalMargin,
     );
 
     // CUSTOM VALUES
@@ -714,8 +724,8 @@ void main() {
             DataColumn(label: Text('Calories'), numeric: true),
             DataColumn(label: Text('Generation')),
           ],
-          horizontalMargin: _customHorizontalMargin,
-          columnSpacing: _customColumnSpacing,
+          horizontalMargin: customHorizontalMargin,
+          columnSpacing: customColumnSpacing,
         ),
       ),
     ));
@@ -725,11 +735,11 @@ void main() {
     cellContent = find.widgetWithText(Align, 'Frozen yogurt (0)');
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customHorizontalMargin,
+      customHorizontalMargin,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
 
     // custom middle column padding
@@ -737,11 +747,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '159');
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
 
     // custom last column padding
@@ -749,11 +759,11 @@ void main() {
     cellContent = find.widgetWithText(Align, '0').first;
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customColumnSpacing / 2,
+      customColumnSpacing / 2,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(cellContent).right,
-      _customHorizontalMargin,
+      customHorizontalMargin,
     );
   });
 
@@ -761,12 +771,16 @@ void main() {
     final TestDataSource source = TestDataSource();
 
     // Note: 800 is wide enough to ensure that all of the columns fit in the
-    // Card. The DataTable can be larger than its containing Card, but this test
-    // is only concerned with ensuring the DataTable is at least as wide as the
-    // Card.
-    const double _originalWidth = 800;
-    const double _expandedWidth = 1600;
-    const double _height = 400;
+    // Card. The test makes sure that the DataTable is exactly as wide
+    // as the Card, minus the Card's margin.
+    const double originalWidth = 800;
+    const double expandedWidth = 1600;
+    const double height = 400;
+
+    // By default, the margin of a Card is 4 in all directions, so
+    // the size of the DataTable (inside the Card) is horizontally
+    // reduced by 4 * 2; the left and right margins.
+    const double cardMargin = 8;
 
     final Size originalSize = binding.renderView.size;
 
@@ -788,28 +802,30 @@ void main() {
       ),
     );
 
-    await binding.setSurfaceSize(const Size(_originalWidth, _height));
+    await binding.setSurfaceSize(const Size(originalWidth, height));
     await tester.pumpWidget(buildWidget());
+
+    double cardWidth = tester.renderObject<RenderBox>(find.byType(Card).first).size.width;
 
     // Widths should be equal before we resize...
     expect(
       tester.renderObject<RenderBox>(find.byType(DataTable).first).size.width,
-      moreOrLessEquals(tester.renderObject<RenderBox>(find.byType(Card).first).size.width),
+      moreOrLessEquals(cardWidth - cardMargin),
     );
 
-    await binding.setSurfaceSize(const Size(_expandedWidth, _height));
+    await binding.setSurfaceSize(const Size(expandedWidth, height));
     await tester.pumpWidget(buildWidget());
 
-    final double cardWidth = tester.renderObject<RenderBox>(find.byType(Card).first).size.width;
+    cardWidth = tester.renderObject<RenderBox>(find.byType(Card).first).size.width;
 
     // ... and should still be equal after the resize.
     expect(
       tester.renderObject<RenderBox>(find.byType(DataTable).first).size.width,
-      moreOrLessEquals(cardWidth),
+      moreOrLessEquals(cardWidth - cardMargin),
     );
 
     // Double check to ensure we actually resized the surface properly.
-    expect(cardWidth, moreOrLessEquals(_expandedWidth));
+    expect(cardWidth, moreOrLessEquals(expandedWidth));
 
     // Reset the surface size.
     await binding.setSurfaceSize(originalSize);
@@ -852,7 +868,6 @@ void main() {
         home: PaginatedDataTable(
           header: const Text('Test table'),
           source: TestDataSource(allowSelection: true),
-          showCheckboxColumn: true,
           columns: const <DataColumn>[
             DataColumn(label: Text('Name')),
             DataColumn(label: Text('Calories'), numeric: true),
@@ -871,17 +886,17 @@ void main() {
   });
 
   testWidgets('PaginatedDataTable custom checkboxHorizontalMargin properly applied', (WidgetTester tester) async {
-    const double _customCheckboxHorizontalMargin = 15.0;
-    const double _customHorizontalMargin = 10.0;
+    const double customCheckboxHorizontalMargin = 15.0;
+    const double customHorizontalMargin = 10.0;
 
-    const double _width = 400;
-    const double _height = 400;
+    const double width = 400;
+    const double height = 400;
 
     final Size originalSize = binding.renderView.size;
 
     // Ensure the containing Card is small enough that we don't expand too
     // much, resulting in our custom margin being ignored.
-    await binding.setSurfaceSize(const Size(_width, _height));
+    await binding.setSurfaceSize(const Size(width, height));
 
     final TestDataSource source = TestDataSource(allowSelection: true);
     Finder cellContent;
@@ -906,8 +921,8 @@ void main() {
             DataColumn(label: Text('Calories'), numeric: true),
             DataColumn(label: Text('Generation')),
           ],
-          horizontalMargin: _customHorizontalMargin,
-          checkboxHorizontalMargin: _customCheckboxHorizontalMargin,
+          horizontalMargin: customHorizontalMargin,
+          checkboxHorizontalMargin: customCheckboxHorizontalMargin,
         ),
       ),
     ));
@@ -917,11 +932,11 @@ void main() {
     padding = find.ancestor(of: checkbox, matching: find.byType(Padding)).first;
     expect(
       tester.getRect(checkbox).left - tester.getRect(padding).left,
-      _customCheckboxHorizontalMargin,
+      customCheckboxHorizontalMargin,
     );
     expect(
       tester.getRect(padding).right - tester.getRect(checkbox).right,
-      _customCheckboxHorizontalMargin,
+      customCheckboxHorizontalMargin,
     );
 
     // Custom first column padding.
@@ -929,7 +944,7 @@ void main() {
     cellContent = find.widgetWithText(Align, 'Frozen yogurt (0)'); // DataTable wraps its DataCells in an Align widget.
     expect(
       tester.getRect(cellContent).left - tester.getRect(padding).left,
-      _customHorizontalMargin,
+      customHorizontalMargin,
     );
 
     // Reset the surface size.
@@ -1001,5 +1016,114 @@ void main() {
     expect(icons.elementAt(1).color, arrowHeadColor);
     expect(icons.elementAt(2).color, arrowHeadColor);
     expect(icons.elementAt(3).color, arrowHeadColor);
+  });
+
+  testWidgets('OverflowBar header left alignment', (WidgetTester tester) async {
+    // Test an old special case that tried to align the first child of a ButtonBar
+    // and the left edge of a Text header widget. Still possible with OverflowBar
+    // albeit without any special case in the implementation's build method.
+    Widget buildFrame(Widget header) {
+      return MaterialApp(
+        home: PaginatedDataTable(
+          header: header,
+          rowsPerPage: 2,
+          source: TestDataSource(),
+          columns: const <DataColumn>[
+            DataColumn(label: Text('Name')),
+            DataColumn(label: Text('Calories'), numeric: true),
+            DataColumn(label: Text('Generation')),
+          ],
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildFrame(const Text('HEADER')));
+    final double headerX = tester.getTopLeft(find.text('HEADER')).dx;
+    final Widget overflowBar = OverflowBar(
+      children: <Widget>[ElevatedButton(onPressed: () {}, child: const Text('BUTTON'))],
+    );
+    await tester.pumpWidget(buildFrame(overflowBar));
+    expect(headerX, tester.getTopLeft(find.byType(ElevatedButton)).dx);
+  });
+
+  testWidgets('PaginatedDataTable can be scrolled using ScrollController', (WidgetTester tester) async {
+    final TestDataSource source = TestDataSource();
+    final ScrollController scrollController = ScrollController();
+
+    Widget buildTable(TestDataSource source) {
+      return Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: 100,
+          child: PaginatedDataTable(
+            controller: scrollController,
+            header: const Text('Test table'),
+            source: source,
+            rowsPerPage: 2,
+            columns: const <DataColumn>[
+              DataColumn(
+                label: Text('Name'),
+                tooltip: 'Name',
+              ),
+              DataColumn(
+                label: Text('Calories'),
+                tooltip: 'Calories',
+                numeric: true,
+              ),
+              DataColumn(
+                label: Text('Generation'),
+                tooltip: 'Generation',
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(MaterialApp(
+      home: buildTable(source),
+    ));
+
+    // DataTable uses provided ScrollController
+    final Scrollable bodyScrollView = tester.widget(find.byType(Scrollable).first);
+    expect(bodyScrollView.controller, scrollController);
+
+    expect(scrollController.offset, 0.0);
+    scrollController.jumpTo(50.0);
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, 50.0);
+  });
+
+  testWidgets('PaginatedDataTable uses PrimaryScrollController when primary ', (WidgetTester tester) async {
+    final ScrollController primaryScrollController = ScrollController();
+    final TestDataSource source = TestDataSource();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PrimaryScrollController(
+          controller: primaryScrollController,
+          child: PaginatedDataTable(
+            primary: true,
+            header: const Text('Test table'),
+            source: source,
+            rowsPerPage: 2,
+            columns: const <DataColumn>[
+              DataColumn(label: Text('Name')),
+              DataColumn(label: Text('Calories'), numeric: true),
+              DataColumn(label: Text('Generation')),
+            ],
+          ),
+        ),
+      )
+    );
+
+    // DataTable uses primaryScrollController
+    final Scrollable bodyScrollView = tester.widget(find.byType(Scrollable).first);
+    expect(bodyScrollView.controller, primaryScrollController);
+
+    // Footer does not use primaryScrollController
+    final Scrollable footerScrollView = tester.widget(find.byType(Scrollable).last);
+    expect(footerScrollView.controller, null);
   });
 }

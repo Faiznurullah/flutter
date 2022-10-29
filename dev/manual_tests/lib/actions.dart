@@ -310,7 +310,7 @@ class UndoableDirectionalFocusAction extends UndoableFocusActionBase<Directional
 
 /// A button class that takes focus when clicked.
 class DemoButton extends StatefulWidget {
-  const DemoButton({Key? key, required this.name}) : super(key: key);
+  const DemoButton({super.key, required this.name});
 
   final String name;
 
@@ -340,12 +340,14 @@ class _DemoButtonState extends State<DemoButton> {
     return TextButton(
       focusNode: _focusNode,
       style: ButtonStyle(
-        foregroundColor: MaterialStateProperty.all<Color>(Colors.black),
+        foregroundColor: const MaterialStatePropertyAll<Color>(Colors.black),
         overlayColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
-          if (states.contains(MaterialState.focused))
+          if (states.contains(MaterialState.focused)) {
             return Colors.red;
-          if (states.contains(MaterialState.hovered))
+          }
+          if (states.contains(MaterialState.hovered)) {
             return Colors.blue;
+          }
           return Colors.transparent;
         }),
       ),
@@ -356,7 +358,7 @@ class _DemoButtonState extends State<DemoButton> {
 }
 
 class FocusDemo extends StatefulWidget {
-  const FocusDemo({Key? key}) : super(key: key);
+  const FocusDemo({super.key});
 
   static GlobalKey appKey = GlobalKey();
 
@@ -423,7 +425,7 @@ class _FocusDemoState extends State<FocusDemo> {
             debugLabel: 'Scope',
             autofocus: true,
             child: DefaultTextStyle(
-              style: textTheme.headline4!,
+              style: textTheme.headlineMedium!,
               child: Scaffold(
                 appBar: AppBar(
                   title: const Text('Actions Demo'),

@@ -26,18 +26,8 @@ void checkTree(WidgetTester tester, List<BoxDecoration> expectedDecorations) {
     }
     expect(child, isNull);
   } catch (e) {
-    print(renderObject.toStringDeep());
+    debugPrint(renderObject.toStringDeep());
     rethrow;
-  }
-}
-
-class MockMultiChildRenderObjectWidget extends MultiChildRenderObjectWidget {
-  MockMultiChildRenderObjectWidget({ Key? key, required List<Widget> children }) : super(key: key, children: children);
-
-  @override
-  RenderObject createRenderObject(BuildContext context) {
-    assert(false);
-    return FakeRenderObject();
   }
 }
 
@@ -357,15 +347,8 @@ void main() {
   });
 }
 
-class FakeRenderObject extends RenderBox {
-  @override
-  void performLayout() {
-    size = constraints.biggest;
-  }
-}
-
 class DummyWidget extends StatelessWidget {
-  const DummyWidget({ Key? key, required this.child }) : super(key: key);
+  const DummyWidget({ super.key, required this.child });
 
   final Widget child;
 

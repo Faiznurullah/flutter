@@ -7,7 +7,7 @@ import 'package:test/test.dart' hide TypeMatcher, isInstanceOf;
 
 void main() {
   group('channel suite', () {
-    FlutterDriver driver;
+    late FlutterDriver driver;
 
     setUpAll(() async {
       driver = await FlutterDriver.connect();
@@ -18,6 +18,7 @@ void main() {
       final SerializableFinder statusField = find.byValueKey('status');
       int step = 0;
       while (await driver.getText(statusField) == 'ok') {
+        print('Tapping for step $step...');
         await driver.tap(stepButton);
         step++;
       }
@@ -25,10 +26,10 @@ void main() {
       if (status != 'complete') {
         fail('Failed at step $step with status $status');
       }
-    }, timeout: const Timeout(Duration(minutes: 1)));
+    }, timeout: Timeout.none);
 
     tearDownAll(() async {
-      driver?.close();
+      driver.close();
     });
   });
 }

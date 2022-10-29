@@ -11,6 +11,11 @@ import 'animation.dart';
 import 'curves.dart';
 import 'listener_helpers.dart';
 
+export 'dart:ui' show VoidCallback;
+
+export 'animation.dart' show Animation, AnimationStatus, AnimationStatusListener;
+export 'curves.dart' show Curve;
+
 // Examples can assume:
 // late AnimationController controller;
 
@@ -188,22 +193,27 @@ class ProxyAnimation extends Animation<double>
   Animation<double>? get parent => _parent;
   Animation<double>? _parent;
   set parent(Animation<double>? value) {
-    if (value == _parent)
+    if (value == _parent) {
       return;
+    }
     if (_parent != null) {
       _status = _parent!.status;
       _value = _parent!.value;
-      if (isListening)
+      if (isListening) {
         didStopListening();
+      }
     }
     _parent = value;
     if (_parent != null) {
-      if (isListening)
+      if (isListening) {
         didStartListening();
-      if (_value != _parent!.value)
+      }
+      if (_value != _parent!.value) {
         notifyListeners();
-      if (_status != _parent!.status)
+      }
+      if (_status != _parent!.status) {
         notifyStatusListeners(_parent!.status);
+      }
       _status = null;
       _value = null;
     }
@@ -233,8 +243,9 @@ class ProxyAnimation extends Animation<double>
 
   @override
   String toString() {
-    if (parent == null)
+    if (parent == null) {
       return '${objectRuntimeType(this, 'ProxyAnimation')}(null; ${super.toStringDetails()} ${value.toStringAsFixed(3)})';
+    }
     return '$parent\u27A9${objectRuntimeType(this, 'ProxyAnimation')}';
   }
 }
@@ -408,6 +419,9 @@ class CurvedAnimation extends Animation<double> with AnimationWithParentMixin<do
   /// animation is used to animate.
   AnimationStatus? _curveDirection;
 
+  /// True if this CurvedAnimation has been disposed.
+  bool isDisposed = false;
+
   void _updateCurveDirection(AnimationStatus status) {
     switch (status) {
       case AnimationStatus.dismissed:
@@ -427,13 +441,20 @@ class CurvedAnimation extends Animation<double> with AnimationWithParentMixin<do
     return reverseCurve == null || (_curveDirection ?? parent.status) != AnimationStatus.reverse;
   }
 
+  /// Cleans up any listeners added by this CurvedAnimation.
+  void dispose() {
+    isDisposed = true;
+    parent.removeStatusListener(_updateCurveDirection);
+  }
+
   @override
   double get value {
     final Curve? activeCurve = _useForwardCurve ? curve : reverseCurve;
 
     final double t = parent.value;
-    if (activeCurve == null)
+    if (activeCurve == null) {
       return t;
+    }
     if (t == 0.0 || t == 1.0) {
       assert(() {
         final double transformedValue = activeCurve.transform(t);
@@ -455,10 +476,12 @@ class CurvedAnimation extends Animation<double> with AnimationWithParentMixin<do
 
   @override
   String toString() {
-    if (reverseCurve == null)
+    if (reverseCurve == null) {
       return '$parent\u27A9$curve';
-    if (_useForwardCurve)
+    }
+    if (_useForwardCurve) {
       return '$parent\u27A9$curve\u2092\u2099/$reverseCurve';
+    }
     return '$parent\u27A9$curve/$reverseCurve\u2092\u2099';
   }
 }
@@ -572,8 +595,9 @@ class TrainHoppingAnimation extends Animation<double>
       _lastValue = newValue;
     }
     assert(_lastValue != null);
-    if (hop && onSwitchedTrain != null)
+    if (hop && onSwitchedTrain != null) {
       onSwitchedTrain!();
+    }
   }
 
   @override
@@ -596,8 +620,9 @@ class TrainHoppingAnimation extends Animation<double>
 
   @override
   String toString() {
-    if (_nextTrain != null)
+    if (_nextTrain != null) {
       return '$currentTrain\u27A9${objectRuntimeType(this, 'TrainHoppingAnimation')}(next: $_nextTrain)';
+    }
     return '$currentTrain\u27A9${objectRuntimeType(this, 'TrainHoppingAnimation')}(no next)';
   }
 }
@@ -651,8 +676,9 @@ abstract class CompoundAnimation<T> extends Animation<T>
   /// Otherwise, default to [first].
   @override
   AnimationStatus get status {
-    if (next.status == AnimationStatus.forward || next.status == AnimationStatus.reverse)
+    if (next.status == AnimationStatus.forward || next.status == AnimationStatus.reverse) {
       return next.status;
+    }
     return first.status;
   }
 

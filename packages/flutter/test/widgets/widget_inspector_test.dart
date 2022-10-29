@@ -2,8 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// no-shuffle:
+//   //TODO(gspencergoog): Remove this tag once this test's state leaks/test
+//   dependencies have been fixed.
+//   https://github.com/flutter/flutter/issues/85160
+//   Fails with "flutter test --test-randomize-ordering-seed=456"
+// reduced-test-set:
+//   This file is run as part of a reduced test set in CI on Mac and Windows
+//   machines.
+@Tags(<String>['reduced-test-set', 'no-shuffle'])
+
 @TestOn('!chrome')
-import 'dart:async';
+
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -19,13 +29,9 @@ import 'widget_inspector_test_utils.dart';
 // Start of block of code where widget creation location line numbers and
 // columns will impact whether tests pass.
 
-class ClockDemo extends StatefulWidget {
-  const ClockDemo({ Key? key }) : super(key: key);
-  @override
-  State<ClockDemo> createState() => _ClockDemoState();
-}
+class ClockDemo extends StatelessWidget {
+  const ClockDemo({ super.key });
 
-class _ClockDemoState extends State<ClockDemo> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -58,9 +64,9 @@ class _ClockDemoState extends State<ClockDemo> {
 
 class ClockText extends StatefulWidget {
   const ClockText({
-    Key? key,
+    super.key,
     this.utcOffset = 0,
-  }) : super(key: key);
+  });
 
   final int utcOffset;
 
@@ -114,7 +120,7 @@ class CyclicDiagnostic extends DiagnosticableTree {
   final String name;
 
   @override
-  String toStringShort() => '${objectRuntimeType(this, 'CyclicDiagnistic')}-$name';
+  String toStringShort() => '${objectRuntimeType(this, 'CyclicDiagnostic')}-$name';
 
   // We have to override toString to avoid the toString call itself triggering a
   // stack overflow.
@@ -134,20 +140,20 @@ class CyclicDiagnostic extends DiagnosticableTree {
 }
 
 class _CreationLocation {
-  const _CreationLocation({
+  _CreationLocation({
+    required this.id,
     required this.file,
     required this.line,
     required this.column,
-    required this.id,
+    required this.name,
   });
 
+  final int id;
   final String file;
   final int line;
   final int column;
-  final int id;
+  String? name;
 }
-
-typedef InspectorServiceExtensionCallback = FutureOr<Map<String, Object>> Function(Map<String, String> parameters);
 
 class RenderRepaintBoundaryWithDebugPaint extends RenderRepaintBoundary {
   @override
@@ -203,9 +209,9 @@ class RenderRepaintBoundaryWithDebugPaint extends RenderRepaintBoundary {
 class RepaintBoundaryWithDebugPaint extends RepaintBoundary {
   /// Creates a widget that isolates repaints.
   const RepaintBoundaryWithDebugPaint({
-    Key? key,
-    Widget? child,
-  }) : super(key: key, child: child);
+    super.key,
+    super.child,
+  });
 
   @override
   RenderRepaintBoundary createRenderObject(BuildContext context) {
@@ -316,11 +322,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
         ),
       );
 
-      expect(getInspectorState().selection.current, isNull);
+      expect(getInspectorState().selection.current, isNull); // ignore: avoid_dynamic_calls
       await tester.tap(find.text('TOP'), warnIfMissed: false);
       await tester.pump();
       // Tap intercepted by the inspector
       expect(log, equals(<String>[]));
+      // ignore: avoid_dynamic_calls
       final InspectorSelection selection = getInspectorState().selection as InspectorSelection;
       expect(paragraphText(selection.current! as RenderParagraph), equals('TOP'));
       final RenderObject topButton = find.byKey(topButtonKey).evaluate().first.renderObject!;
@@ -334,6 +341,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(log, equals(<String>['bottom']));
       log.clear();
       // Ensure the inspector selection has not changed to bottom.
+      // ignore: avoid_dynamic_calls
       expect(paragraphText(getInspectorState().selection.current as RenderParagraph), equals('TOP'));
 
       await tester.tap(find.byKey(selectButtonKey));
@@ -344,6 +352,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       await tester.tap(find.text('BOTTOM'), warnIfMissed: false);
       expect(log, equals(<String>[]));
       log.clear();
+      // ignore: avoid_dynamic_calls
       expect(paragraphText(getInspectorState().selection.current as RenderParagraph), equals('BOTTOM'));
     });
 
@@ -417,7 +426,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       await tester.tap(find.byType(ListView), warnIfMissed: false);
       await tester.pump();
-      expect(getInspectorState().selection.current, isNotNull);
+      expect(getInspectorState().selection.current, isNotNull); // ignore: avoid_dynamic_calls
 
       // Now out of inspect mode due to the click.
       await tester.fling(find.byType(ListView), const Offset(0.0, -200.0), 200.0);
@@ -482,7 +491,6 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
             child: Overlay(
               initialEntries: <OverlayEntry>[
                 OverlayEntry(
-                  opaque: false,
                   maintainState: true,
                   builder: (BuildContext _) => createSubtree(width: 94.0),
                 ),
@@ -492,7 +500,6 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
                   builder: (BuildContext _) => createSubtree(width: 95.0),
                 ),
                 OverlayEntry(
-                  opaque: false,
                   maintainState: true,
                   builder: (BuildContext _) => createSubtree(width: 96.0, key: clickTarget),
                 ),
@@ -507,10 +514,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final dynamic inspectorState = inspectorKey.currentState;
       // The object with width 95.0 wins over the object with width 94.0 because
       // the subtree with width 94.0 is offstage.
+      // ignore: avoid_dynamic_calls
       expect(inspectorState.selection.current.semanticBounds.width, equals(95.0));
 
       // Exactly 2 out of the 3 text elements should be in the candidate list of
       // objects to select as only 2 are onstage.
+      // ignore: avoid_dynamic_calls
       expect(inspectorState.selection.candidates.where((RenderObject object) => object is RenderParagraph).length, equals(2));
     });
 
@@ -618,6 +627,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
         ),
       );
 
+      // ignore: avoid_dynamic_calls
       final InspectorSelection selection = getInspectorState().selection as InspectorSelection;
       // The selection is static, so it may be initialized from previous tests.
       selection.clear();
@@ -798,9 +808,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
         elementA.toDiagnosticsNode().toJsonMap(
           InspectorSerializationDelegate(
             service: service,
-            summaryTree: false,
             includeProperties: true,
-            addAdditionalPropertiesCallback: null,
           ),
         ),
         isNotNull,
@@ -935,7 +943,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final Element elementB = find.text('b').evaluate().first;
 
       service.disposeAllGroups();
-      service.setPubRootDirectories(<String>[]);
+      service.resetPubRootDirectories();
       service.setSelection(elementA, 'my-group');
       final Map<String, Object?> jsonA = json.decode(service.getSelectedWidget(null, 'my-group')) as Map<String, Object?>;
       final Map<String, Object?> creationLocationA = jsonA['creationLocation']! as Map<String, Object?>;
@@ -943,7 +951,8 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final String fileA = creationLocationA['file']! as String;
       final int lineA = creationLocationA['line']! as int;
       final int columnA = creationLocationA['column']! as int;
-      final List<Object?> parameterLocationsA = creationLocationA['parameterLocations']! as List<Object?>;
+      final String nameA = creationLocationA['name']! as String;
+      expect(nameA, equals('Text'));
 
       service.setSelection(elementB, 'my-group');
       final Map<String, Object?> jsonB = json.decode(service.getSelectedWidget(null, 'my-group')) as Map<String, Object?>;
@@ -952,7 +961,8 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final String fileB = creationLocationB['file']! as String;
       final int lineB = creationLocationB['line']! as int;
       final int columnB = creationLocationB['column']! as int;
-      final List<Object?> parameterLocationsB = creationLocationB['parameterLocations']! as List<Object?>;
+      final String? nameB = creationLocationB['name'] as String?;
+      expect(nameB, equals('Text'));
       expect(fileA, endsWith('widget_inspector_test.dart'));
       expect(fileA, equals(fileB));
       // We don't hardcode the actual lines the widgets are created on as that
@@ -961,22 +971,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       // Column numbers are more stable than line numbers.
       expect(columnA, equals(15));
       expect(columnA, equals(columnB));
-      expect(parameterLocationsA.length, equals(1));
-      final Map<String, Object?> paramA = parameterLocationsA[0]! as Map<String, Object?>;
-      expect(paramA['name'], equals('data'));
-      expect(paramA['line'], equals(lineA));
-      expect(paramA['column'], equals(20));
-
-      expect(parameterLocationsB.length, equals(2));
-      final Map<String, Object?> paramB1 = parameterLocationsB[0]! as Map<String, Object?>;
-      expect(paramB1['name'], equals('data'));
-      expect(paramB1['line'], equals(lineB));
-      expect(paramB1['column'], equals(20));
-      final Map<String, Object?> paramB2 = parameterLocationsB[1]! as Map<String, Object?>;
-      expect(paramB2['name'], equals('textDirection'));
-      expect(paramB2['line'], equals(lineB));
-      expect(paramB2['column'], equals(25));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('test transformDebugCreator will re-order if after stack trace', (WidgetTester tester) async {
       final bool widgetTracked = WidgetInspectorService.instance.isWidgetCreationTracked();
@@ -1009,9 +1004,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
           .pathSegments;
         // Strip a couple subdirectories away to generate a plausible pub root
         // directory.
-        pubRootTest = '/' +
-          segments.take(segments.length - 2).join('/');
-        service.setPubRootDirectories(<String>[pubRootTest]);
+        pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+        service.resetPubRootDirectories();
+        service.addPubRootDirectories(<String>[pubRootTest]);
       }
       final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
       builder.add(StringProperty('dummy1', 'value'));
@@ -1072,9 +1067,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
           .pathSegments;
         // Strip a couple subdirectories away to generate a plausible pub root
         // directory.
-        pubRootTest = '/' +
-          segments.take(segments.length - 2).join('/');
-        service.setPubRootDirectories(<String>[pubRootTest]);
+        pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+        service.resetPubRootDirectories();
+        service.addPubRootDirectories(<String>[pubRootTest]);
       }
       final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
       builder.add(StringProperty('dummy1', 'value'));
@@ -1103,7 +1098,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(nodes[3].runtimeType, StringProperty);
       expect(nodes[3].name, 'dummy2');
       expect(nodes[4].runtimeType, DiagnosticsStackTrace);
-    }, skip: WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --no-track-widget-creation flag.
+    }, skip: WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --no-track-widget-creation flag.
 
     testWidgets('test transformDebugCreator will add DevToolsDeepLinkProperty for overflow errors', (WidgetTester tester) async {
       activeDevToolsServerAddress = 'http://127.0.0.1:9100';
@@ -1138,7 +1133,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(nodes[3].runtimeType, DevToolsDeepLinkProperty);
       expect(nodes[4].runtimeType, ErrorSpacer);
       expect(nodes[5].runtimeType, StringProperty);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked());
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('test transformDebugCreator will not add DevToolsDeepLinkProperty for non-overflow errors', (WidgetTester tester) async {
       activeDevToolsServerAddress = 'http://127.0.0.1:9100';
@@ -1170,7 +1165,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(nodes[1].runtimeType, DiagnosticsBlock);
       expect(nodes[2].runtimeType, ErrorSpacer);
       expect(nodes[3].runtimeType, StringProperty);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked());
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked());  // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('test transformDebugCreator will not add DevToolsDeepLinkProperty if devtoolsServerAddress is unavailable', (WidgetTester tester) async {
       activeDevToolsServerAddress = null;
@@ -1202,86 +1197,585 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(nodes[1].runtimeType, DiagnosticsBlock);
       expect(nodes[2].runtimeType, ErrorSpacer);
       expect(nodes[3].runtimeType, StringProperty);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked());
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked());  // [intended] Test requires --track-widget-creation flag.
 
-    testWidgets('WidgetInspectorService setPubRootDirectories', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Stack(
-            children: const <Widget>[
-              Text('a'),
-              Text('b', textDirection: TextDirection.ltr),
-              Text('c', textDirection: TextDirection.ltr),
-            ],
-          ),
-        ),
-      );
-      final Element elementA = find.text('a').evaluate().first;
+    // TODO(CoderDake): Clean up pubRootDirectory tests https://github.com/flutter/flutter/issues/107186
+    group('pubRootDirectory', () {
+      const String directoryA = '/a/b/c';
+      const String directoryB = '/d/e/f';
+      const String directoryC = '/g/h/i';
 
-      service.disposeAllGroups();
-      service.setPubRootDirectories(<String>[]);
-      service.setSelection(elementA, 'my-group');
-      Map<String, Object?> jsonObject = json.decode(service.getSelectedWidget(null, 'my-group')) as Map<String, Object?>;
-      Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
-      expect(creationLocation, isNotNull);
-      final String fileA = creationLocation['file']! as String;
-      expect(fileA, endsWith('widget_inspector_test.dart'));
-      expect(jsonObject, isNot(contains('createdByLocalProject')));
-      final List<String> segments = Uri.parse(fileA).pathSegments;
-      // Strip a couple subdirectories away to generate a plausible pub root
-      // directory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      service.setPubRootDirectories(<String>[pubRootTest]);
+      setUp(() {
+        service.resetPubRootDirectories();
+      });
 
-      service.setSelection(elementA, 'my-group');
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
+      group('addPubRootDirectories', () {
+        test('can add multiple directories', () async {
+          const List<String> directories = <String>[directoryA, directoryB];
+          service.addPubRootDirectories(directories);
 
-      service.setPubRootDirectories(<String>['/invalid/$pubRootTest']);
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), isNot(contains('createdByLocalProject')));
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, unorderedEquals(directories));
+        });
 
-      service.setPubRootDirectories(<String>['file://$pubRootTest']);
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
+        test('can add multiple directories seperately', () async {
+          service.addPubRootDirectories(<String>[directoryA]);
+          service.addPubRootDirectories(<String>[directoryB]);
+          service.addPubRootDirectories(<String>[]);
 
-      service.setPubRootDirectories(<String>['$pubRootTest/different']);
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), isNot(contains('createdByLocalProject')));
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, unorderedEquals(<String>[
+            directoryA,
+            directoryB,
+          ]));
+        });
 
-      service.setPubRootDirectories(<String>[
-        '/invalid/$pubRootTest',
-        pubRootTest,
-      ]);
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
+        test('handles duplicates', () async {
+          const List<String> directories = <String>[
+            directoryA,
+            'file://$directoryA',
+            directoryB,
+            directoryB
+          ];
+          service.addPubRootDirectories(directories);
 
-      // The RichText child of the Text widget is created by the core framework
-      // not the current package.
-      final Element richText = find.descendant(
-        of: find.text('a'),
-        matching: find.byType(RichText),
-      ).evaluate().first;
-      service.setSelection(richText, 'my-group');
-      service.setPubRootDirectories(<String>[pubRootTest]);
-      jsonObject = json.decode(service.getSelectedWidget(null, 'my-group')) as Map<String, Object?>;
-      expect(jsonObject, isNot(contains('createdByLocalProject')));
-      creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
-      expect(creationLocation, isNotNull);
-      // This RichText widget is created by the build method of the Text widget
-      // thus the creation location is in text.dart not basic.dart
-      final List<String> pathSegmentsFramework = Uri.parse(creationLocation['file']! as String).pathSegments;
-      expect(pathSegmentsFramework.join('/'), endsWith('/flutter/lib/src/widgets/text.dart'));
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, unorderedEquals(<String>[
+            directoryA,
+            directoryB,
+          ]));
+        });
+      });
 
-      // Strip off /src/widgets/text.dart.
-      final String pubRootFramework = '/' + pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/');
-      service.setPubRootDirectories(<String>[pubRootFramework]);
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
-      service.setSelection(elementA, 'my-group');
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), isNot(contains('createdByLocalProject')));
+      group('removePubRootDirectories', () {
+        setUp(() {
+          service.resetPubRootDirectories();
+          service.addPubRootDirectories(<String>[directoryA, directoryB, directoryC]);
+        });
 
-      service.setPubRootDirectories(<String>[pubRootFramework, pubRootTest]);
-      service.setSelection(elementA, 'my-group');
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
-      service.setSelection(richText, 'my-group');
-      expect(json.decode(service.getSelectedWidget(null, 'my-group')), contains('createdByLocalProject'));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked() || isBrowser); // Test requires --track-widget-creation flag.
+        test('removes multiple directories', () async {
+          service.removePubRootDirectories(<String>[directoryA, directoryB,]);
+
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, equals(<String>[directoryC]));
+        });
+
+        test('removes multiple directories seperately', () async {
+          service.removePubRootDirectories(<String>[directoryA]);
+          service.removePubRootDirectories(<String>[directoryB]);
+          service.removePubRootDirectories(<String>[]);
+
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, equals(<String>[directoryC]));
+        });
+
+        test('handles duplicates', () async {
+          service.removePubRootDirectories(<String>[
+            'file://$directoryA',
+            directoryA,
+            directoryB,
+            directoryB,
+          ]);
+
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, equals(<String>[directoryC]));
+        });
+
+        test("does nothing if the directories doesn't exist ", () async {
+          service.removePubRootDirectories(<String>['/x/y/z']);
+
+          final List<String> pubRoots = await service.currentPubRootDirectories;
+          expect(pubRoots, unorderedEquals(<String>[
+            directoryA,
+            directoryB,
+            directoryC,
+          ]));
+        });
+      });
+    });
+
+    group(
+    'WidgetInspectorService',
+    () {
+      late final String pubRootTest;
+
+      setUpAll(() {
+        pubRootTest = generateTestPubRootDirectory(service);
+      });
+
+      setUp(() {
+        service.disposeAllGroups();
+        service.resetPubRootDirectories();
+      });
+
+        group('addPubRootDirectories', () {
+          testWidgets(
+            'does not have createdByLocalProject when there are no pubRootDirectories',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              service.setSelection(elementA, 'my-group');
+
+              final Map<String, Object?> jsonObject =
+                  json.decode(service.getSelectedWidget(null, 'my-group'))
+                      as Map<String, Object?>;
+              final Map<String, Object?> creationLocation =
+                  jsonObject['creationLocation']! as Map<String, Object?>;
+
+              expect(creationLocation, isNotNull);
+              final String fileA = creationLocation['file']! as String;
+              expect(fileA, endsWith('widget_inspector_test.dart'));
+              expect(jsonObject, isNot(contains('createdByLocalProject')));
+            },
+          );
+
+          testWidgets(
+            'has createdByLocalProject when the element is part of the pubRootDirectory',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+
+              service.addPubRootDirectories(<String>[pubRootTest]);
+
+              service.setSelection(elementA, 'my-group');
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+            },
+          );
+
+          testWidgets(
+            'does not have createdByLocalProject when widget package directory is a suffix of a pubRootDirectory',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              service.setSelection(elementA, 'my-group');
+
+              service.addPubRootDirectories(<String>['/invalid/$pubRootTest']);
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                isNot(contains('createdByLocalProject')),
+              );
+            },
+          );
+
+          testWidgets(
+            'has createdByLocalProject when the pubRootDirectory is prefixed with file://',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              service.setSelection(elementA, 'my-group');
+
+              service.addPubRootDirectories(<String>['file://$pubRootTest']);
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+            },
+          );
+
+          testWidgets(
+            'does not have createdByLocalProject when thePubRootDirecty has a different suffix',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              service.setSelection(elementA, 'my-group');
+
+              service.addPubRootDirectories(<String>['$pubRootTest/different']);
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                isNot(contains('createdByLocalProject')),
+              );
+            },
+          );
+
+          testWidgets(
+            'has createdByLocalProject even if another pubRootDirectory does not match',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              service.setSelection(elementA, 'my-group');
+
+              service.addPubRootDirectories(<String>[
+                '/invalid/$pubRootTest',
+                pubRootTest,
+              ]);
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+            },
+          );
+
+          testWidgets(
+            'widget is part of core framework and is the child of a widget in the package pubRootDirectories',
+            (WidgetTester tester) async {
+              final Widget widget = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              );
+              await tester.pumpWidget(widget);
+              final Element elementA = find.text('a').evaluate().first;
+              final Element richText = find
+                  .descendant(
+                    of: find.text('a'),
+                    matching: find.byType(RichText),
+                  )
+                  .evaluate()
+                  .first;
+              service.setSelection(richText, 'my-group');
+              service.addPubRootDirectories(<String>[pubRootTest]);
+
+              final Map<String, Object?> jsonObject =
+                  json.decode(service.getSelectedWidget(null, 'my-group'))
+                      as Map<String, Object?>;
+              expect(jsonObject, isNot(contains('createdByLocalProject')));
+              final Map<String, Object?> creationLocation =
+                  jsonObject['creationLocation']! as Map<String, Object?>;
+              expect(creationLocation, isNotNull);
+              // This RichText widget is created by the build method of the Text widget
+              // thus the creation location is in text.dart not basic.dart
+              final List<String> pathSegmentsFramework =
+                  Uri.parse(creationLocation['file']! as String).pathSegments;
+              expect(
+                pathSegmentsFramework.join('/'),
+                endsWith('/flutter/lib/src/widgets/text.dart'),
+              );
+
+              // Strip off /src/widgets/text.dart.
+              final String pubRootFramework =
+                  '/${pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/')}';
+              service.resetPubRootDirectories();
+              service.addPubRootDirectories(<String>[pubRootFramework]);
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+              service.setSelection(elementA, 'my-group');
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                isNot(contains('createdByLocalProject')),
+              );
+
+              service
+                  .setPubRootDirectories(<String>[pubRootFramework, pubRootTest]);
+              service.setSelection(elementA, 'my-group');
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+              service.setSelection(richText, 'my-group');
+              expect(
+                json.decode(service.getSelectedWidget(null, 'my-group')),
+                contains('createdByLocalProject'),
+              );
+            },
+          );
+        });
+
+      group('createdByLocalProject', () {
+        setUp(() {
+          service.resetPubRootDirectories();
+        });
+
+        testWidgets(
+          'reacts to add and removing pubRootDirectories',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+
+            service.addPubRootDirectories(<String>[
+              pubRootTest,
+              'file://$pubRootTest',
+              '/unrelated/$pubRootTest',
+            ]);
+
+            service.setSelection(elementA, 'my-group');
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+
+            service.removePubRootDirectories(<String>[pubRootTest]);
+
+            service.setSelection(elementA, 'my-group');
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'does not match when the package directory does not match',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            service.addPubRootDirectories(<String>[
+              '$pubRootTest/different',
+              '/unrelated/$pubRootTest',
+            ]);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'has createdByLocalProject when the pubRootDirectory is prefixed with file://',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            service.addPubRootDirectories(<String>['file://$pubRootTest']);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'can handle consecutive calls to add',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            service.addPubRootDirectories(<String>[
+              pubRootTest,
+            ]);
+            service.addPubRootDirectories(<String>[
+              '/invalid/$pubRootTest',
+            ]);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+        testWidgets(
+          'can handle removing an unrelated pubRootDirectory',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            service.addPubRootDirectories(<String>[
+              pubRootTest,
+              '/invalid/$pubRootTest',
+            ]);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+
+            service.removePubRootDirectories(<String>[
+              '/invalid/$pubRootTest',
+            ]);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'can handle parent widget being part of a separate package',
+          (WidgetTester tester) async {
+            final Widget widget = Directionality(
+              textDirection: TextDirection.ltr,
+              child: Stack(
+                children: const <Widget>[
+                  Text('a'),
+                  Text('b', textDirection: TextDirection.ltr),
+                  Text('c', textDirection: TextDirection.ltr),
+                ],
+              ),
+            );
+            await tester.pumpWidget(widget);
+            final Element elementA = find.text('a').evaluate().first;
+            final Element richText = find
+                .descendant(
+                  of: find.text('a'),
+                  matching: find.byType(RichText),
+                )
+                .evaluate()
+                .first;
+            service.setSelection(richText, 'my-group');
+            service.addPubRootDirectories(<String>[pubRootTest]);
+
+            final Map<String, Object?> jsonObject =
+                json.decode(service.getSelectedWidget(null, 'my-group'))
+                    as Map<String, Object?>;
+            expect(jsonObject, isNot(contains('createdByLocalProject')));
+            final Map<String, Object?> creationLocation =
+                jsonObject['creationLocation']! as Map<String, Object?>;
+            expect(creationLocation, isNotNull);
+            // This RichText widget is created by the build method of the Text widget
+            // thus the creation location is in text.dart not basic.dart
+            final List<String> pathSegmentsFramework =
+                Uri.parse(creationLocation['file']! as String).pathSegments;
+            expect(
+              pathSegmentsFramework.join('/'),
+              endsWith('/flutter/lib/src/widgets/text.dart'),
+            );
+
+            // Strip off /src/widgets/text.dart.
+            final String pubRootFramework =
+                '/${pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/')}';
+            service.resetPubRootDirectories();
+            service.addPubRootDirectories(<String>[pubRootFramework]);
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+            service.setSelection(elementA, 'my-group');
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              isNot(contains('createdByLocalProject')),
+            );
+
+            service.resetPubRootDirectories();
+            service
+                .addPubRootDirectories(<String>[pubRootFramework, pubRootTest]);
+            service.setSelection(elementA, 'my-group');
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+            service.setSelection(richText, 'my-group');
+            expect(
+              json.decode(service.getSelectedWidget(null, 'my-group')),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+      });
+    },
+    skip: !WidgetInspectorService.instance.isWidgetCreationTracked(), // [intended] Test requires --track-widget-creation flag.
+  );
 
     test('ext.flutter.inspector.disposeGroup', () async {
       final Object a = Object();
@@ -1291,10 +1785,19 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final String? aId = service.toId(a, group1);
       expect(service.toId(a, group2), equals(aId));
       expect(service.toId(a, group3), equals(aId));
-      await service.testExtension('disposeGroup', <String, String>{'objectGroup': group1});
-      await service.testExtension('disposeGroup', <String, String>{'objectGroup': group2});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeGroup.name,
+        <String, String>{'objectGroup': group1},
+      );
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeGroup.name,
+        <String, String>{'objectGroup': group2},
+      );
       expect(service.toObject(aId), equals(a));
-      await service.testExtension('disposeGroup', <String, String>{'objectGroup': group3});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeGroup.name,
+        <String, String>{'objectGroup': group3},
+      );
       expect(() => service.toObject(aId), throwsFlutterError);
     });
 
@@ -1306,11 +1809,20 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final String aId = service.toId(a, group1)!;
       final String bId = service.toId(b, group1)!;
       expect(service.toId(a, group2), equals(aId));
-      await service.testExtension('disposeId', <String, String>{'arg': bId, 'objectGroup': group1});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeId.name,
+        <String, String>{'arg': bId, 'objectGroup': group1},
+      );
       expect(() => service.toObject(bId), throwsFlutterError);
-      await service.testExtension('disposeId', <String, String>{'arg': aId, 'objectGroup': group1});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeId.name,
+        <String, String>{'arg': aId, 'objectGroup': group1},
+      );
       expect(service.toObject(aId), equals(a));
-      await service.testExtension('disposeId', <String, String>{'arg': aId, 'objectGroup': group2});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.disposeId.name,
+        <String, String>{'arg': aId, 'objectGroup': group2},
+      );
       expect(() => service.toObject(aId), throwsFlutterError);
     });
 
@@ -1351,7 +1863,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(selectionChangedCount, equals(2));
       expect(service.selection.current, equals(elementB.renderObject));
 
-      await service.testExtension('setSelectionById', <String, String>{'arg': service.toId(elementA, 'my-group')!, 'objectGroup': 'my-group'});
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.setSelectionById.name,
+        <String, String>{'arg': service.toId(elementA, 'my-group')!, 'objectGroup': 'my-group'},
+      );
       expect(selectionChangedCount, equals(3));
       expect(service.selection.currentElement, equals(elementA));
       expect(service.selection.current, equals(elementA.renderObject));
@@ -1379,7 +1894,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       final Element elementB = find.text('b').evaluate().first;
       final String bId = service.toId(elementB, group)!;
-      final Object? jsonList = await service.testExtension('getParentChain', <String, String>{'arg': bId, 'objectGroup': group});
+      final Object? jsonList = await service.testExtension(
+        WidgetInspectorServiceExtensions.getParentChain.name,
+        <String, String>{'arg': bId, 'objectGroup': group},
+      );
       expect(jsonList, isList);
       final List<Object?> chainElements = jsonList! as List<Object?>;
       final List<Element> expectedChain = elementB.debugGetDiagnosticChain().reversed.toList();
@@ -1419,7 +1937,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final DiagnosticsNode diagnostic = const Text('a', textDirection: TextDirection.ltr).toDiagnosticsNode();
       const String group = 'group';
       final String id = service.toId(diagnostic, group)!;
-      final List<Object?> propertiesJson = (await service.testExtension('getProperties', <String, String>{'arg': id, 'objectGroup': group}))! as List<Object?>;
+      final List<Object?> propertiesJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getProperties.name,
+        <String, String>{'arg': id, 'objectGroup': group},
+      ))! as List<Object?>;
       final List<DiagnosticsNode> properties = diagnostic.getProperties();
       expect(properties, isNotEmpty);
       expect(propertiesJson.length, equals(properties.length));
@@ -1447,7 +1968,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       );
       final DiagnosticsNode diagnostic = find.byType(Stack).evaluate().first.toDiagnosticsNode();
       final String id = service.toId(diagnostic, group)!;
-      final List<Object?> propertiesJson = (await service.testExtension('getChildren', <String, String>{'arg': id, 'objectGroup': group}))! as List<Object?>;
+      final List<Object?> propertiesJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildren.name,
+        <String, String>{'arg': id, 'objectGroup': group},
+      ))! as List<Object?>;
       final List<DiagnosticsNode> children = diagnostic.getChildren();
       expect(children.length, equals(3));
       expect(propertiesJson.length, equals(children.length));
@@ -1475,7 +1999,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       );
       final DiagnosticsNode diagnostic = find.byType(Stack).evaluate().first.toDiagnosticsNode();
       final String id = service.toId(diagnostic, group)!;
-      final List<Object?> childrenJson = (await service.testExtension('getChildrenDetailsSubtree', <String, String>{'arg': id, 'objectGroup': group}))! as List<Object?>;
+      final List<Object?> childrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenDetailsSubtree.name,
+        <String, String>{'arg': id, 'objectGroup': group},
+      ))! as List<Object?>;
       final List<DiagnosticsNode> children = diagnostic.getChildren();
       expect(children.length, equals(3));
       expect(childrenJson.length, equals(children.length));
@@ -1511,7 +2038,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       );
       final DiagnosticsNode diagnostic = find.byType(Stack).evaluate().first.toDiagnosticsNode();
       final String id = service.toId(diagnostic, group)!;
-      final Map<String, Object?> subtreeJson = (await service.testExtension('getDetailsSubtree', <String, String>{'arg': id, 'objectGroup': group}))! as Map<String, Object?>;
+      final Map<String, Object?> subtreeJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getDetailsSubtree.name,
+        <String, String>{'arg': id, 'objectGroup': group},
+      ))! as Map<String, Object?>;
       expect(subtreeJson['objectId'], equals(id));
       final List<Object?> childrenJson = subtreeJson['children']! as List<Object?>;
       final List<DiagnosticsNode> children = diagnostic.getChildren();
@@ -1535,7 +2065,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       }
 
       final Map<String, Object?> deepSubtreeJson = (await service.testExtension(
-        'getDetailsSubtree',
+        WidgetInspectorServiceExtensions.getDetailsSubtree.name,
         <String, String>{'arg': id, 'objectGroup': group, 'subtreeDepth': '3'},
       ))! as Map<String, Object?>;
       final List<Object?> deepChildrenJson = deepSubtreeJson['children']! as List<Object?>;
@@ -1557,7 +2087,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       final DiagnosticsNode diagnostic = a.toDiagnosticsNode();
       final String id = service.toId(diagnostic, group)!;
-      final Map<String, Object?> subtreeJson = (await service.testExtension('getDetailsSubtree', <String, String>{'arg': id, 'objectGroup': group}))! as Map<String, Object?>;
+      final Map<String, Object?> subtreeJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getDetailsSubtree.name,
+        <String, String>{'arg': id, 'objectGroup': group},
+      ))! as Map<String, Object?>;
       expect(subtreeJson['objectId'], equals(id));
       expect(subtreeJson, contains('children'));
       final List<Object?> propertiesJson = subtreeJson['properties']! as List<Object?>;
@@ -1599,17 +2132,23 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final Element elementA = find.text('a').evaluate().first;
 
       service.disposeAllGroups();
-      await service.testExtension('setPubRootDirectories', <String, String>{});
+      service.resetPubRootDirectories();
       service.setSelection(elementA, 'my-group');
-      final Map<String, dynamic> jsonA = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, dynamic>;
+      final Map<String, dynamic> jsonA = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, dynamic>;
 
-      await service.testExtension('setPubRootDirectories', <String, String>{});
-      Map<String, Object?> rootJson = (await service.testExtension('getRootWidgetSummaryTree', <String, String>{'objectGroup': group}))! as Map<String, Object?>;
+      service.resetPubRootDirectories();
+      Map<String, Object?> rootJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getRootWidgetSummaryTree.name,
+        <String, String>{'objectGroup': group},
+      ))! as Map<String, Object?>;
       // We haven't yet properly specified which directories are summary tree
       // directories so we get an empty tree other than the root that is always
       // included.
       final Object? rootWidget = service.toObject(rootJson['valueId']! as String);
-      expect(rootWidget, equals(WidgetsBinding.instance?.renderViewElement));
+      expect(rootWidget, equals(WidgetsBinding.instance.renderViewElement));
       List<Object?> childrenJson = rootJson['children']! as List<Object?>;
       // There are no summary tree children.
       expect(childrenJson.length, equals(0));
@@ -1621,17 +2160,27 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final List<String> segments = Uri.parse(testFile).pathSegments;
       // Strip a couple subdirectories away to generate a plausible pub root
       // directory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest});
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service.resetPubRootDirectories();
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+        <String, String>{'arg0': pubRootTest},
+      );
 
-      rootJson = (await service.testExtension('getRootWidgetSummaryTree', <String, String>{'objectGroup': group}))! as Map<String, Object?>;
+      rootJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getRootWidgetSummaryTree.name,
+        <String, String>{'objectGroup': group},
+      ))! as Map<String, Object?>;
       childrenJson = rootJson['children']! as List<Object?>;
       // The tree of nodes returned contains all widgets created directly by the
       // test.
       childrenJson = rootJson['children']! as List<Object?>;
       expect(childrenJson.length, equals(1));
 
-      List<Object?> alternateChildrenJson = (await service.testExtension('getChildrenSummaryTree', <String, String>{'arg': rootJson['objectId']! as String, 'objectGroup': group}))! as List<Object?>;
+      List<Object?> alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': rootJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
       expect(alternateChildrenJson.length, equals(1));
       Map<String, Object?> childJson = childrenJson[0]! as Map<String, Object?>;
       Map<String, Object?> alternateChildJson = alternateChildrenJson[0]! as Map<String, Object?>;
@@ -1640,7 +2189,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(alternateChildJson['valueId'], equals(childJson['valueId']));
 
       childrenJson = childJson['children']! as List<Object?>;
-      alternateChildrenJson = (await service.testExtension('getChildrenSummaryTree', <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group}))! as List<Object?>;
+      alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
       expect(alternateChildrenJson.length, equals(1));
       expect(childrenJson.length, equals(1));
       alternateChildJson = alternateChildrenJson[0]! as Map<String, Object?>;
@@ -1651,7 +2203,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       childrenJson = childJson['children']! as List<Object?>;
 
       childrenJson = childJson['children']! as List<Object?>;
-      alternateChildrenJson = (await service.testExtension('getChildrenSummaryTree', <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group}))! as List<Object?>;
+      alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
       expect(alternateChildrenJson.length, equals(3));
       expect(childrenJson.length, equals(3));
       alternateChildJson = alternateChildrenJson[2]! as Map<String, Object?>;
@@ -1659,10 +2214,105 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(childJson['description'], startsWith('Text'));
       expect(alternateChildJson['description'], startsWith('Text'));
       expect(alternateChildJson['valueId'], equals(childJson['valueId']));
-      alternateChildrenJson = (await service.testExtension('getChildrenSummaryTree', <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group}))! as List<Object?>;
+      alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
       expect(alternateChildrenJson.length , equals(0));
+      // Tests are failing when this typo is fixed.
       expect(childJson['chidlren'], isNull);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
+
+    testWidgets('ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews', (WidgetTester tester) async {
+      const String group = 'test-group';
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Stack(
+            children: const <Widget>[
+              Text('a', textDirection: TextDirection.ltr),
+              Text('b', textDirection: TextDirection.ltr),
+              Text('c', textDirection: TextDirection.ltr),
+            ],
+          ),
+        ),
+      );
+      final Element elementA = find.text('a').evaluate().first;
+
+      service
+        ..disposeAllGroups()
+        ..resetPubRootDirectories()
+        ..setSelection(elementA, 'my-group');
+
+      final Map<String, dynamic> jsonA = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, dynamic>;
+
+
+      final Map<String, Object?> creationLocation = jsonA['creationLocation']! as Map<String, Object?>;
+      expect(creationLocation, isNotNull);
+      final String testFile = creationLocation['file']! as String;
+      expect(testFile, endsWith('widget_inspector_test.dart'));
+      final List<String> segments = Uri.parse(testFile).pathSegments;
+      // Strip a couple subdirectories away to generate a plausible pub root
+      // directory.
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service
+        ..resetPubRootDirectories()
+        ..addPubRootDirectories(<String>[pubRootTest]);
+
+      final Map<String, Object?> rootJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getRootWidgetSummaryTreeWithPreviews.name,
+        <String, String>{'groupName': group},
+      ))! as Map<String, Object?>;
+      List<Object?> childrenJson = rootJson['children']! as List<Object?>;
+      // The tree of nodes returned contains all widgets created directly by the
+      // test.
+      childrenJson = rootJson['children']! as List<Object?>;
+      expect(childrenJson.length, equals(1));
+
+      List<Object?> alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': rootJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
+      expect(alternateChildrenJson.length, equals(1));
+      Map<String, Object?> childJson = childrenJson[0]! as Map<String, Object?>;
+      Map<String, Object?> alternateChildJson = alternateChildrenJson[0]! as Map<String, Object?>;
+      expect(childJson['description'], startsWith('Directionality'));
+      expect(alternateChildJson['description'], startsWith('Directionality'));
+      expect(alternateChildJson['valueId'], equals(childJson['valueId']));
+
+      childrenJson = childJson['children']! as List<Object?>;
+      alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
+      expect(alternateChildrenJson.length, equals(1));
+      expect(childrenJson.length, equals(1));
+      alternateChildJson = alternateChildrenJson[0]! as Map<String, Object?>;
+      childJson = childrenJson[0]! as Map<String, Object?>;
+      expect(childJson['description'], startsWith('Stack'));
+      expect(alternateChildJson['description'], startsWith('Stack'));
+      expect(alternateChildJson['valueId'], equals(childJson['valueId']));
+      childrenJson = childJson['children']! as List<Object?>;
+
+      childrenJson = childJson['children']! as List<Object?>;
+      alternateChildrenJson = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getChildrenSummaryTree.name,
+        <String, String>{'arg': childJson['objectId']! as String, 'objectGroup': group},
+      ))! as List<Object?>;
+      expect(alternateChildrenJson.length, equals(3));
+      expect(childrenJson.length, equals(3));
+      alternateChildJson = alternateChildrenJson[2]! as Map<String, Object?>;
+      childJson = childrenJson[2]! as Map<String, Object?>;
+      expect(childJson['description'], startsWith('Text'));
+
+      // [childJson] contains the 'textPreview' key since the tree was requested
+      // with previews [getRootWidgetSummaryTreeWithPreviews].
+      expect(childJson['textPreview'], equals('c'));
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('ext.flutter.inspector.getSelectedSummaryWidget', (WidgetTester tester) async {
       const String group = 'test-group';
@@ -1686,13 +2336,19 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final DiagnosticsNode richTextDiagnostic = children.first;
 
       service.disposeAllGroups();
-      await service.testExtension('setPubRootDirectories', <String, String>{});
+      service.resetPubRootDirectories();
       service.setSelection(elementA, 'my-group');
-      final Map<String, Object?> jsonA = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
+      final Map<String, Object?> jsonA = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, Object?>;
       service.setSelection(richTextDiagnostic.value, 'my-group');
 
-      await service.testExtension('setPubRootDirectories', <String, String>{});
-      Map<String, Object?>? summarySelection = await service.testExtension('getSelectedSummaryWidget', <String, String>{'objectGroup': group}) as Map<String, Object?>?;
+      service.resetPubRootDirectories();
+      Map<String, Object?>? summarySelection = await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedSummaryWidget.name,
+        <String, String>{'objectGroup': group},
+      ) as Map<String, Object?>?;
       // No summary selection because we haven't set the pub root directories
       // yet to indicate what directories are in the summary tree.
       expect(summarySelection, isNull);
@@ -1704,10 +2360,17 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final List<String> segments = Uri.parse(testFile).pathSegments;
       // Strip a couple subdirectories away to generate a plausible pub root
       // directory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest});
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service.resetPubRootDirectories();
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+        <String, String>{'arg0': pubRootTest},
+      );
 
-      summarySelection = (await service.testExtension('getSelectedSummaryWidget', <String, String>{'objectGroup': group}))! as Map<String, Object?>;
+      summarySelection = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedSummaryWidget.name,
+        <String, String>{'objectGroup': group},
+      ))! as Map<String, Object?>;
       expect(summarySelection['valueId'], isNotNull);
       // We got the Text element instead of the selected RichText element
       // because only the RichText element is part of the summary tree.
@@ -1715,9 +2378,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       // Verify tha the regular getSelectedWidget method still returns
       // the RichText object not the Text element.
-      final Map<String, Object?> regularSelection = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
+      final Map<String, Object?> regularSelection = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, Object?>;
       expect(service.toObject(regularSelection['valueId']! as String), richTextDiagnostic.value);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('ext.flutter.inspector creationLocation', (WidgetTester tester) async {
       await tester.pumpWidget(
@@ -1736,24 +2402,28 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final Element elementB = find.text('b').evaluate().first;
 
       service.disposeAllGroups();
-      await service.testExtension('setPubRootDirectories', <String, String>{});
+      service.resetPubRootDirectories();
       service.setSelection(elementA, 'my-group');
-      final Map<String, Object?> jsonA = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
+      final Map<String, Object?> jsonA = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, Object?>;
       final Map<String, Object?> creationLocationA = jsonA['creationLocation']! as Map<String, Object?>;
       expect(creationLocationA, isNotNull);
       final String fileA = creationLocationA['file']! as String;
       final int lineA = creationLocationA['line']! as int;
       final int columnA = creationLocationA['column']! as int;
-      final List<Object?> parameterLocationsA = creationLocationA['parameterLocations']! as List<Object?>;
 
       service.setSelection(elementB, 'my-group');
-      final Map<String, Object?> jsonB = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
+      final Map<String, Object?> jsonB = (await service.testExtension(
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
+      ))! as Map<String, Object?>;
       final Map<String, Object?> creationLocationB = jsonB['creationLocation']! as Map<String, Object?>;
       expect(creationLocationB, isNotNull);
       final String fileB = creationLocationB['file']! as String;
       final int lineB = creationLocationB['line']! as int;
       final int columnB = creationLocationB['column']! as int;
-      final List<Object?> parameterLocationsB = creationLocationB['parameterLocations']! as List<Object?>;
       expect(fileA, endsWith('widget_inspector_test.dart'));
       expect(fileA, equals(fileB));
       // We don't hardcode the actual lines the widgets are created on as that
@@ -1762,153 +2432,1017 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       // Column numbers are more stable than line numbers.
       expect(columnA, equals(15));
       expect(columnA, equals(columnB));
-      expect(parameterLocationsA.length, equals(1));
-      final Map<String, Object?> paramA = parameterLocationsA[0]! as Map<String, Object?>;
-      expect(paramA['name'], equals('data'));
-      expect(paramA['line'], equals(lineA));
-      expect(paramA['column'], equals(20));
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
-      expect(parameterLocationsB.length, equals(2));
-      final Map<String, Object?> paramB1 = parameterLocationsB[0]! as Map<String, Object?>;
-      expect(paramB1['name'], equals('data'));
-      expect(paramB1['line'], equals(lineB));
-      expect(paramB1['column'], equals(20));
-      final Map<String, Object?> paramB2 = parameterLocationsB[1]! as Map<String, Object?>;
-      expect(paramB2['name'], equals('textDirection'));
-      expect(paramB2['line'], equals(lineB));
-      expect(paramB2['column'], equals(25));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    group(
+      'ext.flutter.inspector.addPubRootDirectories group',
+      () {
+        late final String pubRootTest;
 
-    testWidgets('ext.flutter.inspector.setPubRootDirectories', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Stack(
-            children: const <Widget>[
-              Text('a'),
-              Text('b', textDirection: TextDirection.ltr),
-              Text('c', textDirection: TextDirection.ltr),
-            ],
-          ),
-        ),
-      );
-      final Element elementA = find.text('a').evaluate().first;
+        setUpAll(() async {
+          pubRootTest = generateTestPubRootDirectory(service);
+        });
 
-      await service.testExtension('setPubRootDirectories', <String, String>{});
-      service.setSelection(elementA, 'my-group');
-      Map<String, Object?> jsonObject = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
-      Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
-      expect(creationLocation, isNotNull);
-      final String fileA = creationLocation['file']! as String;
-      expect(fileA, endsWith('widget_inspector_test.dart'));
-      expect(jsonObject, isNot(contains('createdByLocalProject')));
-      final List<String> segments = Uri.parse(fileA).pathSegments;
-      // Strip a couple subdirectories away to generate a plausible pub root
-      // directory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest});
+        setUp(() {
+          service.resetPubRootDirectories();
+        });
 
-      service.setSelection(elementA, 'my-group');
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
+        testWidgets(
+          'has createdByLocalProject when the widget is in the pubRootDirectory',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
 
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': '/invalid/$pubRootTest'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), isNot(contains('createdByLocalProject')));
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
 
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': 'file://$pubRootTest'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': pubRootTest},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
 
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': '$pubRootTest/different'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), isNot(contains('createdByLocalProject')));
+        testWidgets(
+          'does not have createdByLocalProject if the prefix of the pubRootDirectory is different',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
 
-      await service.testExtension('setPubRootDirectories', <String, String>{
-        'arg0': '/unrelated/$pubRootTest',
-        'arg1': 'file://$pubRootTest',
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': '/invalid/$pubRootTest'},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'has createdByLocalProject if the pubRootDirectory is prefixed with file://',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': 'file://$pubRootTest'},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'does not have createdByLocalProject if the pubRootDirectory has a different suffix',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': '$pubRootTest/different'},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'has createdByLocalProject if at least one of the pubRootDirectories matches',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{
+                'arg0': '/unrelated/$pubRootTest',
+                'arg1': 'file://$pubRootTest',
+              },
+            );
+
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'widget is part of core framework and is the child of a widget in the package pubRootDirectories',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+
+            // The RichText child of the Text widget is created by the core framework
+            // not the current package.
+            final Element richText = find
+                .descendant(
+                  of: find.text('a'),
+                  matching: find.byType(RichText),
+                )
+                .evaluate()
+                .first;
+            service.setSelection(richText, 'my-group');
+            service.setPubRootDirectories(<String>[pubRootTest]);
+            final Map<String, Object?> jsonObject =
+                json.decode(service.getSelectedWidget(null, 'my-group'))
+                    as Map<String, Object?>;
+            expect(jsonObject, isNot(contains('createdByLocalProject')));
+            final Map<String, Object?> creationLocation =
+                jsonObject['creationLocation']! as Map<String, Object?>;
+            expect(creationLocation, isNotNull);
+            // This RichText widget is created by the build method of the Text widget
+            // thus the creation location is in text.dart not basic.dart
+            final List<String> pathSegmentsFramework =
+                Uri.parse(creationLocation['file']! as String).pathSegments;
+            expect(
+              pathSegmentsFramework.join('/'),
+              endsWith('/flutter/lib/src/widgets/text.dart'),
+            );
+
+            // Strip off /src/widgets/text.dart.
+            final String pubRootFramework =
+                '/${pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/')}';
+            service.resetPubRootDirectories();
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': pubRootFramework},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+            service.setSelection(elementA, 'my-group');
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              isNot(contains('createdByLocalProject')),
+            );
+
+            service.resetPubRootDirectories();
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': pubRootFramework, 'arg1': pubRootTest},
+            );
+            service.setSelection(elementA, 'my-group');
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+            service.setSelection(richText, 'my-group');
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+      },
+      skip: !WidgetInspectorService.instance.isWidgetCreationTracked(), // [intended] Test requires --track-widget-creation flag.
+    );
+
+    group(
+      'ext.flutter.inspector.setPubRootDirectories extra args regression test',
+      () {
+        // Ensure that passing the isolate id as an argument won't break
+        // setPubRootDirectories command.
+
+        late final String pubRootTest;
+
+        setUpAll(() {
+          pubRootTest = generateTestPubRootDirectory(service);
+        });
+
+        setUp(() {
+          service.resetPubRootDirectories();
+        });
+
+        testWidgets(
+          'has createdByLocalProject when the widget is in the pubRootDirectory',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                      Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': pubRootTest, 'isolateId': '34'},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'does not have createdByLocalProject if the prefix of the pubRootDirectory is different',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{
+                'arg0': '/invalid/$pubRootTest',
+                'isolateId': '34'
+              },
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'has createdByLocalProject if the pubRootDirectory is prefixed with file://',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{'arg0': 'file://$pubRootTest', 'isolateId': '34'},
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+
+        testWidgets(
+          'does not have createdByLocalProject if the pubRootDirectory has a different suffix',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{
+                'arg0': '$pubRootTest/different',
+                'isolateId': '34'
+              },
+            );
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              isNot(contains('createdByLocalProject')),
+            );
+          },
+        );
+
+        testWidgets(
+          'has createdByLocalProject if at least one of the pubRootDirectories matches',
+          (WidgetTester tester) async {
+            await tester.pumpWidget(
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  children: const <Widget>[
+                    Text('a'),
+                    Text('b', textDirection: TextDirection.ltr),
+                    Text('c', textDirection: TextDirection.ltr),
+                  ],
+                ),
+              ),
+            );
+            final Element elementA = find.text('a').evaluate().first;
+            service.setSelection(elementA, 'my-group');
+
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{
+                'arg0': '/unrelated/$pubRootTest',
+                'isolateId': '34',
+                'arg1': 'file://$pubRootTest',
+              },
+            );
+
+            expect(
+              await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ),
+              contains('createdByLocalProject'),
+            );
+          },
+        );
+      },
+      skip: !WidgetInspectorService.instance.isWidgetCreationTracked(), // [intended] Test requires --track-widget-creation flag.
+    );
+
+    Map<Object, Object?> removeLastEvent(List<Map<Object, Object?>> events) {
+      final Map<Object, Object?> event = events.removeLast();
+      // Verify that the event is json encodable.
+      json.encode(event);
+      return event;
+    }
+
+    group('ext.flutter.inspector createdByLocalProject', () {
+      late final String pubRootTest;
+
+      setUpAll(() {
+        pubRootTest = generateTestPubRootDirectory(service);
       });
 
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-
-      // The RichText child of the Text widget is created by the core framework
-      // not the current package.
-      final Element richText = find.descendant(
-        of: find.text('a'),
-        matching: find.byType(RichText),
-      ).evaluate().first;
-      service.setSelection(richText, 'my-group');
-      service.setPubRootDirectories(<String>[pubRootTest]);
-      jsonObject = json.decode(service.getSelectedWidget(null, 'my-group')) as Map<String, Object?>;
-      expect(jsonObject, isNot(contains('createdByLocalProject')));
-      creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
-      expect(creationLocation, isNotNull);
-      // This RichText widget is created by the build method of the Text widget
-      // thus the creation location is in text.dart not basic.dart
-      final List<String> pathSegmentsFramework = Uri.parse(creationLocation['file']! as String).pathSegments;
-      expect(pathSegmentsFramework.join('/'), endsWith('/flutter/lib/src/widgets/text.dart'));
-
-      // Strip off /src/widgets/text.dart.
-      final String pubRootFramework = '/' + pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootFramework});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-      service.setSelection(elementA, 'my-group');
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), isNot(contains('createdByLocalProject')));
-
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootFramework, 'arg1': pubRootTest});
-      service.setSelection(elementA, 'my-group');
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-      service.setSelection(richText, 'my-group');
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked() || isBrowser); // Test requires --track-widget-creation flag.
-
-    testWidgets('ext.flutter.inspector.setPubRootDirectories extra args regression test', (WidgetTester tester) async {
-      // Ensure that passing the isolate id as an argument won't break
-      // setPubRootDirectories command.
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Stack(
-            children: const <Widget>[
-              Text('a'),
-              Text('b', textDirection: TextDirection.ltr),
-              Text('c', textDirection: TextDirection.ltr),
-            ],
-          ),
-        ),
-      );
-      final Element elementA = find.text('a').evaluate().first;
-
-      await service.testExtension('setPubRootDirectories', <String, String>{'isolateId': '34'});
-      service.setSelection(elementA, 'my-group');
-      final Map<String, Object?> jsonObject = (await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}))! as Map<String, Object?>;
-      final Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
-      expect(creationLocation, isNotNull);
-      final String fileA = creationLocation['file']! as String;
-      expect(fileA, endsWith('widget_inspector_test.dart'));
-      expect(jsonObject, isNot(contains('createdByLocalProject')));
-      final List<String> segments = Uri.parse(fileA).pathSegments;
-      // Strip a couple subdirectories away to generate a plausible pub root
-      // directory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest, 'isolateId': '34'});
-
-      service.setSelection(elementA, 'my-group');
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': '/invalid/$pubRootTest', 'isolateId': '34'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), isNot(contains('createdByLocalProject')));
-
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': 'file://$pubRootTest', 'isolateId': '34'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': '$pubRootTest/different', 'isolateId': '34'});
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), isNot(contains('createdByLocalProject')));
-
-      await service.testExtension('setPubRootDirectories', <String, String>{
-        'arg0': '/unrelated/$pubRootTest',
-        'isolateId': '34',
-        'arg1': 'file://$pubRootTest',
+      setUp(() {
+        service.resetPubRootDirectories();
       });
 
-      expect(await service.testExtension('getSelectedWidget', <String, String>{'objectGroup': 'my-group'}), contains('createdByLocalProject'));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked() || isBrowser); // Test requires --track-widget-creation flag.
+      testWidgets(
+        'reacts to add and removing pubRootDirectories',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+
+          await service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+              'arg1': 'file://$pubRootTest',
+              'arg2': '/unrelated/$pubRootTest',
+            },
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+
+          await service.testExtension(
+            WidgetInspectorServiceExtensions.removePubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+            },
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            isNot(contains('createdByLocalProject')),
+          );
+        },
+      );
+
+      testWidgets(
+        'does not match when the package directory does not match',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': '$pubRootTest/different',
+              'arg1': '/unrelated/$pubRootTest',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            isNot(contains('createdByLocalProject')),
+          );
+        },
+      );
+
+      testWidgets(
+        'has createdByLocalProject when the pubRootDirectory is prefixed with file://',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{'arg0':'file://$pubRootTest'},
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+
+      testWidgets(
+        'can handle consecutive calls to add',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{'arg0': pubRootTest},
+          );
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{'arg0': '/invalid/$pubRootTest'},
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+      testWidgets(
+        'can handle removing an unrelated pubRootDirectory',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+              'arg1': '/invalid/$pubRootTest',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.removePubRootDirectories.name,
+            <String, String>{'arg0': '/invalid/$pubRootTest'},
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+
+      testWidgets(
+        'can handle parent widget being part of a separate package',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          final Element richText = find
+              .descendant(
+                of: find.text('a'),
+                matching: find.byType(RichText),
+              )
+              .evaluate()
+              .first;
+          service.setSelection(richText, 'my-group');
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{ 'arg0': pubRootTest },
+          );
+
+          final Map<String, Object?> jsonObject =
+              (await service.testExtension(
+                WidgetInspectorServiceExtensions.getSelectedWidget.name,
+                <String, String>{'objectGroup': 'my-group'},
+              ))! as Map<String, Object?>;
+          expect(jsonObject, isNot(contains('createdByLocalProject')));
+          final Map<String, Object?> creationLocation =
+              jsonObject['creationLocation']! as Map<String, Object?>;
+          expect(creationLocation, isNotNull);
+          // This RichText widget is created by the build method of the Text widget
+          // thus the creation location is in text.dart not basic.dart
+          final List<String> pathSegmentsFramework =
+              Uri.parse(creationLocation['file']! as String).pathSegments;
+          expect(
+            pathSegmentsFramework.join('/'),
+            endsWith('/flutter/lib/src/widgets/text.dart'),
+          );
+
+          // Strip off /src/widgets/text.dart.
+          final String pubRootFramework =
+              '/${pathSegmentsFramework.take(pathSegmentsFramework.length - 3).join('/')}';
+          service.resetPubRootDirectories();
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{'arg0': pubRootFramework},
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            isNot(contains('createdByLocalProject')),
+          );
+
+          service.resetPubRootDirectories();
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootFramework,
+              'arg1': pubRootTest,
+            },
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+          service.setSelection(richText, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group'},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+    },
+      skip: !WidgetInspectorService.instance.isWidgetCreationTracked(), // [intended] Test requires --track-widget-creation flag.
+    );
+
+    group('ext.flutter.inspector createdByLocalProject extra args regression test', () {
+      late final String pubRootTest;
+
+      setUpAll(() {
+        pubRootTest = generateTestPubRootDirectory(service);
+      });
+
+      setUp(() {
+        service.resetPubRootDirectories();
+      });
+
+      testWidgets(
+        'reacts to add and removing pubRootDirectories',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+
+          await service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+              'arg1': 'file://$pubRootTest',
+              'arg2': '/unrelated/$pubRootTest',
+              'isolateId': '34',
+            },
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group', 'isolateId': '34',},
+            ),
+            contains('createdByLocalProject'),
+          );
+
+          await service.testExtension(
+            WidgetInspectorServiceExtensions.removePubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+              'isolateId': '34',
+            },
+          );
+          service.setSelection(elementA, 'my-group');
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group', 'isolateId': '34',},
+            ),
+            isNot(contains('createdByLocalProject')),
+          );
+        },
+      );
+
+      testWidgets(
+        'does not match when the package directory does not match',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': '$pubRootTest/different',
+              'arg1': '/unrelated/$pubRootTest',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group', 'isolateId': '34',},
+            ),
+            isNot(contains('createdByLocalProject')),
+          );
+        },
+      );
+
+      testWidgets(
+        'has createdByLocalProject when the pubRootDirectory is prefixed with file://',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0':'file://$pubRootTest',
+              'isolateId': '34',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group', 'isolateId': '34',},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+
+      testWidgets(
+        'can handle consecutive calls to add',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': pubRootTest,
+              'isolateId': '34',
+            },
+          );
+          service.testExtension(
+            WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+            <String, String>{
+              'arg0': '/invalid/$pubRootTest',
+              'isolateId': '34',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{'objectGroup': 'my-group', 'isolateId': '34',},
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+      testWidgets(
+        'can handle removing an unrelated pubRootDirectory',
+        (WidgetTester tester) async {
+          final Widget widget = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: const <Widget>[
+                Text('a'),
+                Text('b', textDirection: TextDirection.ltr),
+                Text('c', textDirection: TextDirection.ltr),
+              ],
+            ),
+          );
+          await tester.pumpWidget(widget);
+          final Element elementA = find.text('a').evaluate().first;
+          service.setSelection(elementA, 'my-group');
+
+          service.testExtension(
+              WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+              <String, String>{
+              'arg0': pubRootTest,
+              'arg1': '/invalid/$pubRootTest',
+              'isolateId': '34',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{
+                'objectGroup': 'my-group',
+                'isolateId': '34',
+              },
+            ),
+            contains('createdByLocalProject'),
+          );
+
+          service.testExtension(
+            WidgetInspectorServiceExtensions.removePubRootDirectories.name,
+            <String, String>{
+              'arg0': '/invalid/$pubRootTest',
+              'isolateId': '34',
+            },
+          );
+          expect(
+            await service.testExtension(
+              WidgetInspectorServiceExtensions.getSelectedWidget.name,
+              <String, String>{
+                'objectGroup': 'my-group',
+                'isolateId': '34',
+              },
+            ),
+            contains('createdByLocalProject'),
+          );
+        },
+      );
+    },
+      skip: !WidgetInspectorService.instance.isWidgetCreationTracked(), // [intended] Test requires --track-widget-creation flag.
+    );
 
     testWidgets('ext.flutter.inspector.trackRebuildDirtyWidgets', (WidgetTester tester) async {
       service.rebuildCount = 0;
@@ -1919,7 +3453,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       service.setSelection(clockDemoElement, 'my-group');
       final Map<String, Object?> jsonObject = (await service.testExtension(
-        'getSelectedWidget',
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
         <String, String>{'objectGroup': 'my-group'},
       ))! as Map<String, Object?>;
       final Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
@@ -1929,9 +3463,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final List<String> segments = Uri.parse(file).pathSegments;
       // Strip a couple subdirectories away to generate a plausible pub root
       // directory.
-      final String pubRootTest =
-          '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest});
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service.resetPubRootDirectories();
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+        <String, String>{'arg0': pubRootTest},
+      );
 
       final List<Map<Object, Object?>> rebuildEvents =
           service.getEventsDispatched('Flutter.RebuiltWidgets');
@@ -1939,14 +3476,17 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       expect(service.rebuildCount, equals(0));
       expect(
-        await service.testBoolExtension('trackRebuildDirtyWidgets', <String, String>{'enabled': 'true'}),
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.trackRebuildDirtyWidgets.name,
+          <String, String>{'enabled': 'true'},
+        ),
         equals('true'),
       );
       expect(service.rebuildCount, equals(1));
       await tester.pump();
 
       expect(rebuildEvents.length, equals(1));
-      Map<Object, Object?> event = rebuildEvents.removeLast();
+      Map<Object, Object?> event = removeLastEvent(rebuildEvents);
       expect(event['startTime'], isA<int>());
       List<int> data = event['events']! as List<int>;
       expect(data.length, equals(14));
@@ -1955,15 +3495,22 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(newLocations, isNotNull);
       expect(newLocations.length, equals(1));
       expect(newLocations.keys.first, equals(file));
+      Map<String, Map<String, List<Object?>>> fileLocationsMap = event['locations']! as Map<String, Map<String, List<Object?>>>;
+      expect(fileLocationsMap, isNotNull);
+      expect(fileLocationsMap.length, equals(1));
+      expect(fileLocationsMap.keys.first, equals(file));
       final List<int> locationsForFile = newLocations[file]!;
       expect(locationsForFile.length, equals(21));
       final int numLocationEntries = locationsForFile.length ~/ 3;
       expect(numLocationEntries, equals(numDataEntries));
+      final Map<String, List<Object?>> locations = fileLocationsMap[file]!;
+      expect(locations.length, equals(4));
+      expect(locations['ids']!.length, equals(7));
 
       final Map<int, _CreationLocation> knownLocations = <int, _CreationLocation>{};
       _addToKnownLocationsMap(
         knownLocations: knownLocations,
-        newLocations: newLocations,
+        newLocations: fileLocationsMap,
       );
       int totalCount = 0;
       int maxCount = 0;
@@ -1987,11 +3534,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       state.updateTime(); // Triggers a rebuild.
       await tester.pump();
       expect(rebuildEvents.length, equals(1));
-      event = rebuildEvents.removeLast();
+      event = removeLastEvent(rebuildEvents);
       expect(event['startTime'], isA<int>());
       data = event['events']! as List<int>;
       // No new locations were rebuilt.
       expect(event, isNot(contains('newLocations')));
+      expect(event, isNot(contains('locations')));
 
       // There were two rebuilds: one for the ClockText element itself and one
       // for its child.
@@ -2001,8 +3549,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       _CreationLocation location = knownLocations[id]!;
       expect(location.file, equals(file));
       // ClockText widget.
-      expect(location.line, equals(53));
+      expect(location.line, equals(59));
       expect(location.column, equals(9));
+      expect(location.name, equals('ClockText'));
       expect(count, equals(1));
 
       id = data[2];
@@ -2010,8 +3559,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       location = knownLocations[id]!;
       expect(location.file, equals(file));
       // Text widget in _ClockTextState build method.
-      expect(location.line, equals(91));
+      expect(location.line, equals(97));
       expect(location.column, equals(12));
+      expect(location.name, equals('Text'));
       expect(count, equals(1));
 
       // Update 3 of the clocks;
@@ -2023,11 +3573,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       await tester.pump();
       expect(rebuildEvents.length, equals(1));
-      event = rebuildEvents.removeLast();
+      event = removeLastEvent(rebuildEvents);
       expect(event['startTime'], isA<int>());
       data = event['events']! as List<int>;
       // No new locations were rebuilt.
       expect(event, isNot(contains('newLocations')));
+      expect(event, isNot(contains('locations')));
 
       expect(data.length, equals(4));
       id = data[0];
@@ -2035,8 +3586,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       location = knownLocations[id]!;
       expect(location.file, equals(file));
       // ClockText widget.
-      expect(location.line, equals(53));
+      expect(location.line, equals(59));
       expect(location.column, equals(9));
+      expect(location.name, equals('ClockText'));
       expect(count, equals(3)); // 3 clock widget instances rebuilt.
 
       id = data[2];
@@ -2044,8 +3596,9 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       location = knownLocations[id]!;
       expect(location.file, equals(file));
       // Text widget in _ClockTextState build method.
-      expect(location.line, equals(91));
+      expect(location.line, equals(97));
       expect(location.column, equals(12));
+      expect(location.name, equals('Text'));
       expect(count, equals(3)); // 3 clock widget instances rebuilt.
 
       // Update one clock 3 times.
@@ -2057,11 +3610,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       await tester.pump();
       expect(rebuildEvents.length, equals(1));
-      event = rebuildEvents.removeLast();
+      event = removeLastEvent(rebuildEvents);
       expect(event['startTime'], isA<int>());
       data = event['events']! as List<int>;
       // No new locations were rebuilt.
       expect(event, isNot(contains('newLocations')));
+      expect(event, isNot(contains('locations')));
 
       expect(data.length, equals(4));
       id = data[0];
@@ -2074,10 +3628,11 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       state.stopClock();
       await tester.pump();
       expect(rebuildEvents.length, equals(1));
-      event = rebuildEvents.removeLast();
+      event = removeLastEvent(rebuildEvents);
       expect(event['startTime'], isA<int>());
       data = event['events']! as List<int>;
       newLocations = event['newLocations']! as Map<String, List<int>>;
+      fileLocationsMap = event['locations']! as Map<String, Map<String, List<Object?>>>;
 
       expect(data.length, equals(4));
       // The second pair in data is the previously unseen rebuild location.
@@ -2088,14 +3643,17 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(knownLocations, isNot(contains(id)));
       _addToKnownLocationsMap(
         knownLocations: knownLocations,
-        newLocations: newLocations,
+        newLocations: fileLocationsMap,
       );
       // Verify the rebuild location was included in the newLocations data.
       expect(knownLocations, contains(id));
 
       // Turn off rebuild counts.
       expect(
-        await service.testBoolExtension('trackRebuildDirtyWidgets', <String, String>{'enabled': 'false'}),
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.trackRebuildDirtyWidgets.name,
+          <String, String>{'enabled': 'false'},
+        ),
         equals('false'),
       );
 
@@ -2103,7 +3661,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       await tester.pump();
       // Verify that rebuild events are not fired once the extension is disabled.
       expect(rebuildEvents, isEmpty);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('ext.flutter.inspector.trackRepaintWidgets', (WidgetTester tester) async {
       service.rebuildCount = 0;
@@ -2114,7 +3672,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       service.setSelection(clockDemoElement, 'my-group');
       final Map<String, Object?> jsonObject = (await service.testExtension(
-        'getSelectedWidget',
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
         <String, String>{'objectGroup': 'my-group'},
       ))! as Map<String, Object?>;
       final Map<String, Object?> creationLocation =
@@ -2125,9 +3683,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final List<String> segments = Uri.parse(file).pathSegments;
       // Strip a couple subdirectories away to generate a plausible pub root
       // directory.
-      final String pubRootTest =
-          '/' + segments.take(segments.length - 2).join('/');
-      await service.testExtension('setPubRootDirectories', <String, String>{'arg0': pubRootTest});
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service.resetPubRootDirectories();
+      await service.testExtension(
+        WidgetInspectorServiceExtensions.addPubRootDirectories.name,
+        <String, String>{'arg0': pubRootTest},
+      );
 
       final List<Map<Object, Object?>> repaintEvents =
           service.getEventsDispatched('Flutter.RepaintWidgets');
@@ -2135,7 +3696,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       expect(service.rebuildCount, equals(0));
       expect(
-        await service.testBoolExtension('trackRepaintWidgets', <String, String>{'enabled': 'true'}),
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.trackRepaintWidgets.name,
+          <String, String>{'enabled': 'true'},
+        ),
         equals('true'),
       );
       // Unlike trackRebuildDirtyWidgets, trackRepaintWidgets doesn't force a full
@@ -2145,7 +3709,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       await tester.pump();
 
       expect(repaintEvents.length, equals(1));
-      Map<Object, Object?> event = repaintEvents.removeLast();
+      Map<Object, Object?> event = removeLastEvent(repaintEvents);
       expect(event['startTime'], isA<int>());
       List<int> data = event['events']! as List<int>;
       expect(data.length, equals(18));
@@ -2154,16 +3718,22 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(newLocations, isNotNull);
       expect(newLocations.length, equals(1));
       expect(newLocations.keys.first, equals(file));
+      final Map<String, Map<String, List<Object?>>> fileLocationsMap = event['locations']! as Map<String, Map<String, List<Object?>>>;
+      expect(fileLocationsMap, isNotNull);
+      expect(fileLocationsMap.length, equals(1));
+      expect(fileLocationsMap.keys.first, equals(file));
       final List<int> locationsForFile = newLocations[file]!;
       expect(locationsForFile.length, equals(27));
       final int numLocationEntries = locationsForFile.length ~/ 3;
       expect(numLocationEntries, equals(numDataEntries));
+      final Map<String, List<Object?>> locations = fileLocationsMap[file]!;
+      expect(locations.length, equals(4));
+      expect(locations['ids']!.length, equals(9));
 
-      final Map<int, _CreationLocation> knownLocations =
-          <int, _CreationLocation>{};
+      final Map<int, _CreationLocation> knownLocations = <int, _CreationLocation>{};
       _addToKnownLocationsMap(
         knownLocations: knownLocations,
-        newLocations: newLocations,
+        newLocations: fileLocationsMap,
       );
       int totalCount = 0;
       int maxCount = 0;
@@ -2187,11 +3757,12 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       state.updateTime(); // Triggers a rebuild.
       await tester.pump();
       expect(repaintEvents.length, equals(1));
-      event = repaintEvents.removeLast();
+      event = removeLastEvent(repaintEvents);
       expect(event['startTime'], isA<int>());
       data = event['events']! as List<int>;
       // No new locations were rebuilt.
       expect(event, isNot(contains('newLocations')));
+      expect(event, isNot(contains('locations')));
 
       // Triggering a rebuild of one widget in this app causes the whole app
       // to repaint.
@@ -2202,7 +3773,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       // Turn off rebuild counts.
       expect(
-        await service.testBoolExtension('trackRepaintWidgets', <String, String>{'enabled': 'false'}),
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.trackRepaintWidgets.name,
+          <String, String>{'enabled': 'false'},
+        ),
         equals('false'),
       );
 
@@ -2210,7 +3784,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       await tester.pump();
       // Verify that repaint events are not fired once the extension is disabled.
       expect(repaintEvents, isEmpty);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('ext.flutter.inspector.show', (WidgetTester tester) async {
       final Iterable<Map<Object, Object?>> extensionChangedEvents = service.getServiceExtensionStateChangedEvents('ext.flutter.inspector.show');
@@ -2218,27 +3792,57 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       service.rebuildCount = 0;
       expect(extensionChangedEvents, isEmpty);
-      expect(await service.testBoolExtension('show', <String, String>{'enabled': 'true'}), equals('true'));
+      expect(
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.show.name,
+          <String, String>{'enabled': 'true'},
+        ),
+        equals('true'),
+      );
       expect(extensionChangedEvents.length, equals(1));
       extensionChangedEvent = extensionChangedEvents.last;
       expect(extensionChangedEvent['extension'], equals('ext.flutter.inspector.show'));
       expect(extensionChangedEvent['value'], isTrue);
       expect(service.rebuildCount, equals(1));
-      expect(await service.testBoolExtension('show', <String, String>{}), equals('true'));
+      expect(
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.show.name,
+          <String, String>{},
+        ),
+        equals('true'),
+      );
       expect(WidgetsApp.debugShowWidgetInspectorOverride, isTrue);
       expect(extensionChangedEvents.length, equals(1));
-      expect(await service.testBoolExtension('show', <String, String>{'enabled': 'true'}), equals('true'));
+      expect(
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.show.name,
+          <String, String>{'enabled': 'true'},
+        ),
+        equals('true'),
+      );
       expect(extensionChangedEvents.length, equals(2));
       extensionChangedEvent = extensionChangedEvents.last;
       expect(extensionChangedEvent['extension'], equals('ext.flutter.inspector.show'));
       expect(extensionChangedEvent['value'], isTrue);
       expect(service.rebuildCount, equals(1));
-      expect(await service.testBoolExtension('show', <String, String>{'enabled': 'false'}), equals('false'));
+      expect(
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.show.name,
+          <String, String>{'enabled': 'false'},
+        ),
+        equals('false'),
+      );
       expect(extensionChangedEvents.length, equals(3));
       extensionChangedEvent = extensionChangedEvents.last;
       expect(extensionChangedEvent['extension'], equals('ext.flutter.inspector.show'));
       expect(extensionChangedEvent['value'], isFalse);
-      expect(await service.testBoolExtension('show', <String, String>{}), equals('false'));
+      expect(
+        await service.testBoolExtension(
+          WidgetInspectorServiceExtensions.show.name,
+          <String, String>{},
+        ),
+        equals('false'),
+      );
       expect(extensionChangedEvents.length, equals(3));
       expect(service.rebuildCount, equals(2));
       expect(WidgetsApp.debugShowWidgetInspectorOverride, isFalse);
@@ -2491,7 +4095,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       // Verify we get the same image if we go through the service extension
       // instead of invoking the screenshot method directly.
       final Future<Object?> base64ScreenshotFuture = service.testExtension(
-        'screenshot',
+        WidgetInspectorServiceExtensions.screenshot.name,
         <String, String>{
           'id': service.toId(clipRect, 'group')!,
           'width': '100.0',
@@ -2501,18 +4105,17 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
         },
       );
 
-      final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.ensureInitialized() as TestWidgetsFlutterBinding;
+      final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.ensureInitialized();
       final ui.Image screenshotImage = (await binding.runAsync<ui.Image>(() async {
         final String base64Screenshot = (await base64ScreenshotFuture)! as String;
         final ui.Codec codec = await ui.instantiateImageCodec(base64.decode(base64Screenshot));
         final ui.FrameInfo frame = await codec.getNextFrame();
         return frame.image;
-      }, additionalTime: const Duration(seconds: 11)))!;
+      }))!;
 
       await expectLater(
         screenshotImage,
         matchesReferenceImage((await clipRectScreenshot)!),
-        skip: !isLinux,
       );
 
       // Test with a very visible debug paint
@@ -2550,6 +4153,292 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       );
     });
 
+    group('layout explorer', () {
+      const String group = 'test-group';
+
+      tearDown(() {
+        service.disposeAllGroups();
+      });
+
+      Future<void> pumpWidgetForLayoutExplorer(WidgetTester tester) async {
+        final Widget widget = Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: Row(
+              children: <Widget>[
+                Flexible(
+                  child: Container(
+                    color: Colors.green,
+                    child: const Text('a'),
+                  ),
+                ),
+                const Text('b'),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpWidget(widget);
+      }
+
+      testWidgets('ext.flutter.inspector.getLayoutExplorerNode for RenderBox with BoxParentData',(WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element rowElement = tester.element(find.byType(Row));
+        service.setSelection(rowElement, group);
+
+        final DiagnosticsNode diagnostic = rowElement.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        final Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Row'));
+
+        final Map<String, Object?>? renderObject = result['renderObject'] as Map<String, Object?>?;
+        expect(renderObject, isNotNull);
+        expect(renderObject!['description'], startsWith('RenderFlex'));
+
+        final Map<String, Object?>? parentRenderElement = result['parentRenderElement'] as Map<String, Object?>?;
+        expect(parentRenderElement, isNotNull);
+        expect(parentRenderElement!['description'], equals('Center'));
+
+        final Map<String, Object?>? constraints = result['constraints'] as Map<String, Object?>?;
+        expect(constraints, isNotNull);
+        expect(constraints!['type'], equals('BoxConstraints'));
+        expect(constraints['minWidth'], equals('0.0'));
+        expect(constraints['minHeight'], equals('0.0'));
+        expect(constraints['maxWidth'], equals('800.0'));
+        expect(constraints['maxHeight'], equals('600.0'));
+
+        expect(result['isBox'], equals(true));
+
+        final Map<String, Object?>? size = result['size'] as Map<String, Object?>?;
+        expect(size, isNotNull);
+        expect(size!['width'], equals('800.0'));
+        expect(size['height'], equals('14.0'));
+
+        expect(result['flexFactor'], isNull);
+        expect(result['flexFit'], isNull);
+
+        final Map<String, Object?>? parentData = result['parentData'] as Map<String, Object?>?;
+        expect(parentData, isNotNull);
+        expect(parentData!['offsetX'], equals('0.0'));
+        expect(parentData['offsetY'], equals('293.0'));
+      });
+
+      testWidgets('ext.flutter.inspector.getLayoutExplorerNode for RenderBox with FlexParentData',(WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element flexibleElement = tester.element(find.byType(Flexible).first);
+        service.setSelection(flexibleElement, group);
+
+        final DiagnosticsNode diagnostic = flexibleElement.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        final Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Flexible'));
+
+        final Map<String, Object?>? renderObject = result['renderObject'] as Map<String, Object?>?;
+        expect(renderObject, isNotNull);
+        expect(renderObject!['description'], startsWith('_RenderColoredBox'));
+
+        final Map<String, Object?>? parentRenderElement = result['parentRenderElement'] as Map<String, Object?>?;
+        expect(parentRenderElement, isNotNull);
+        expect(parentRenderElement!['description'], equals('Row'));
+
+        final Map<String, Object?>? constraints = result['constraints'] as Map<String, Object?>?;
+        expect(constraints, isNotNull);
+        expect(constraints!['type'], equals('BoxConstraints'));
+        expect(constraints['minWidth'], equals('0.0'));
+        expect(constraints['minHeight'], equals('0.0'));
+        expect(constraints['maxWidth'], equals('786.0'));
+        expect(constraints['maxHeight'], equals('600.0'));
+
+        expect(result['isBox'], equals(true));
+
+        final Map<String, Object?>? size = result['size'] as Map<String, Object?>?;
+        expect(size, isNotNull);
+        expect(size!['width'], equals('14.0'));
+        expect(size['height'], equals('14.0'));
+
+        expect(result['flexFactor'], equals(1));
+        expect(result['flexFit'], equals('loose'));
+
+        expect(result['parentData'], isNull);
+      });
+
+
+      testWidgets('ext.flutter.inspector.getLayoutExplorerNode for RenderView',(WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element element = tester.element(find.byType(Directionality).first);
+        Element? root;
+        element.visitAncestorElements((Element ancestor) {
+          if (root == null) {
+            root = ancestor;
+            // Stop traversing ancestors.
+            return false;
+          }
+          return true;
+        });
+        expect(root, isNotNull);
+        service.setSelection(root, group);
+
+        final DiagnosticsNode diagnostic = root!.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        final Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('[root]'));
+
+        final Map<String, Object?>? renderObject = result['renderObject'] as Map<String, Object?>?;
+        expect(renderObject, isNotNull);
+        expect(renderObject!['description'], startsWith('RenderView'));
+
+        expect(result['parentRenderElement'], isNull);
+        expect(result['constraints'], isNull);
+        expect(result['isBox'], isNull);
+
+        final Map<String, Object?>? size = result['size'] as Map<String, Object?>?;
+        expect(size, isNotNull);
+        expect(size!['width'], equals('800.0'));
+        expect(size['height'], equals('600.0'));
+
+        expect(result['flexFactor'], isNull);
+        expect(result['flexFit'], isNull);
+        expect(result['parentData'], isNull);
+      });
+
+      testWidgets('ext.flutter.inspector.setFlexFit', (WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element childElement = tester.element(find.byType(Flexible).first);
+        service.setSelection(childElement, group);
+
+        final DiagnosticsNode diagnostic = childElement.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Flexible'));
+        expect(result['flexFit'], equals('loose'));
+
+        final String valueId = result['valueId']! as String;
+
+        final bool flexFitSuccess = (await service.testExtension(
+          WidgetInspectorServiceExtensions.setFlexFit.name,
+          <String, String>{'id': valueId, 'flexFit': 'FlexFit.tight'},
+        ))! as bool;
+        expect(flexFitSuccess, isTrue);
+
+        result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Flexible'));
+        expect(result['flexFit'], equals('tight'));
+      });
+
+      testWidgets('ext.flutter.inspector.setFlexFactor', (WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element childElement = tester.element(find.byType(Flexible).first);
+        service.setSelection(childElement, group);
+
+        final DiagnosticsNode diagnostic = childElement.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Flexible'));
+        expect(result['flexFactor'], equals(1));
+
+        final String valueId = result['valueId']! as String;
+
+        final bool flexFactorSuccess = (await service.testExtension(
+          WidgetInspectorServiceExtensions.setFlexFactor.name,
+          <String, String>{'id': valueId, 'flexFactor': '3'},
+        ))! as bool;
+        expect(flexFactorSuccess, isTrue);
+
+        result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Flexible'));
+        expect(result['flexFactor'], equals(3));
+      });
+
+      testWidgets('ext.flutter.inspector.setFlexProperties', (WidgetTester tester) async {
+        await pumpWidgetForLayoutExplorer(tester);
+
+        final Element rowElement = tester.element(find.byType(Row).first);
+        service.setSelection(rowElement, group);
+
+        final DiagnosticsNode diagnostic = rowElement.toDiagnosticsNode();
+        final String id = service.toId(diagnostic, group)!;
+        Map<String, Object?> result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Row'));
+
+        Map<String, Object?> renderObject = result['renderObject']! as Map<String, Object?>;
+        List<Map<String, Object?>> properties =
+            (renderObject['properties']! as List<dynamic>).cast<Map<String, Object?>>();
+        Map<String, Object?> mainAxisAlignmentProperties =
+            properties.firstWhere(
+          (Map<String, Object?> p) => p['type'] == 'EnumProperty<MainAxisAlignment>',
+        );
+        Map<String, Object?> crossAxisAlignmentProperties =
+            properties.firstWhere(
+          (Map<String, Object?> p) => p['type'] == 'EnumProperty<CrossAxisAlignment>',
+        );
+        String mainAxisAlignment = mainAxisAlignmentProperties['description']! as String;
+        String crossAxisAlignment = crossAxisAlignmentProperties['description']! as String;
+        expect(mainAxisAlignment, equals('start'));
+        expect(crossAxisAlignment, equals('center'));
+
+        final String valueId = result['valueId']! as String;
+        final bool flexFactorSuccess = (await service.testExtension(
+          WidgetInspectorServiceExtensions.setFlexProperties.name,
+          <String, String>{
+            'id': valueId,
+            'mainAxisAlignment': 'MainAxisAlignment.center',
+            'crossAxisAlignment': 'CrossAxisAlignment.start',
+          },
+        ))! as bool;
+        expect(flexFactorSuccess, isTrue);
+
+        result = (await service.testExtension(
+          WidgetInspectorServiceExtensions.getLayoutExplorerNode.name,
+          <String, String>{'id': id, 'groupName': group, 'subtreeDepth': '1'},
+        ))! as Map<String, Object?>;
+        expect(result['description'], equals('Row'));
+
+        renderObject = result['renderObject']! as Map<String, Object?>;
+        properties =
+            (renderObject['properties']! as List<dynamic>).cast<Map<String, Object?>>();
+        mainAxisAlignmentProperties =
+            properties.firstWhere(
+          (Map<String, Object?> p) => p['type'] == 'EnumProperty<MainAxisAlignment>',
+        );
+        crossAxisAlignmentProperties =
+            properties.firstWhere(
+          (Map<String, Object?> p) => p['type'] == 'EnumProperty<CrossAxisAlignment>',
+        );
+        mainAxisAlignment = mainAxisAlignmentProperties['description']! as String;
+        crossAxisAlignment = crossAxisAlignmentProperties['description']! as String;
+        expect(mainAxisAlignment, equals('center'));
+        expect(crossAxisAlignment, equals('start'));
+      });
+    });
+
     test('ext.flutter.inspector.structuredErrors', () async {
       List<Map<Object, Object?>> flutterErrorEvents = service.getEventsDispatched('Flutter.Error');
       expect(flutterErrorEvents, isEmpty);
@@ -2559,7 +4448,10 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       try {
         // Enable structured errors.
         expect(
-          await service.testBoolExtension('structuredErrors', <String, String>{'enabled': 'true'}),
+          await service.testBoolExtension(
+            WidgetInspectorServiceExtensions.structuredErrors.name,
+            <String, String>{'enabled': 'true'},
+          ),
           equals('true'),
         );
 
@@ -2602,7 +4494,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
         // Reloads the app.
         final FlutterExceptionHandler? oldHandler = FlutterError.onError;
-        final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.ensureInitialized() as TestWidgetsFlutterBinding;
+        final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.ensureInitialized();
         // We need the runTest to setup the fake async in the test binding.
         await binding.runTest(() async {
           binding.reassembleApplication();
@@ -2852,8 +4744,8 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       // Figure out the pubRootDirectory
       final Map<String, Object?> jsonObject = (await service.testExtension(
-          'getSelectedWidget',
-          <String, String>{'objectGroup': 'my-group'},
+        WidgetInspectorServiceExtensions.getSelectedWidget.name,
+        <String, String>{'objectGroup': 'my-group'},
       ))! as Map<String, Object?>;
       final Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
       expect(creationLocation, isNotNull);
@@ -2861,16 +4753,19 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       expect(file, endsWith('widget_inspector_test.dart'));
       final List<String> segments = Uri.parse(file).pathSegments;
       // Strip a couple subdirectories away to generate a plausible pub rootdirectory.
-      final String pubRootTest = '/' + segments.take(segments.length - 2).join('/');
-      service.setPubRootDirectories(<String>[pubRootTest]);
+      final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+      service.resetPubRootDirectories();
+      service.addPubRootDirectories(<String>[pubRootTest]);
 
       final String summary = service.getRootWidgetSummaryTree('foo1');
+      // ignore: avoid_dynamic_calls
       final List<Object?> childrenOfRoot = json.decode(summary)['children'] as List<Object?>;
       final List<Object?> childrenOfMaterialApp = (childrenOfRoot.first! as Map<String, Object?>)['children']! as List<Object?>;
       final Map<String, Object?> scaffold = childrenOfMaterialApp.first! as Map<String, Object?>;
       expect(scaffold['description'], 'Scaffold');
       final String objectId = scaffold['objectId']! as String;
       final String details = service.getDetailsSubtree(objectId, 'foo2');
+      // ignore: avoid_dynamic_calls
       final List<Object?> detailedChildren = json.decode(details)['children'] as List<Object?>;
 
       final List<Map<String, Object?>> appBars = <Map<String, Object?>>[];
@@ -2886,7 +4781,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       }
       visitChildren(detailedChildren);
       expect(appBars.single, isNot(contains('children')));
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
 
     testWidgets('InspectorSerializationDelegate addAdditionalPropertiesCallback', (WidgetTester tester) async {
       await tester.pumpWidget(
@@ -2915,7 +4810,6 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final InspectorSerializationDelegate delegate =
         InspectorSerializationDelegate(
           service: service,
-          summaryTree: false,
           includeProperties: true,
           addAdditionalPropertiesCallback:
             (DiagnosticsNode node, InspectorSerializationDelegate delegate) {
@@ -2944,7 +4838,6 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final InspectorSerializationDelegate emptyDelegate =
         InspectorSerializationDelegate(
           service: service,
-          summaryTree: false,
           includeProperties: true,
           addAdditionalPropertiesCallback:
             (DiagnosticsNode node, InspectorSerializationDelegate delegate) {
@@ -2954,9 +4847,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
       final InspectorSerializationDelegate defaultDelegate =
         InspectorSerializationDelegate(
           service: service,
-          summaryTree: false,
           includeProperties: true,
-          addAdditionalPropertiesCallback: null,
         );
       expect(node.toJsonMap(emptyDelegate), node.toJsonMap(defaultDelegate));
     });
@@ -2988,7 +4879,47 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
 
       expect(debugIsLocalCreationLocation(paddingElement), isFalse);
       expect(debugIsLocalCreationLocation(paddingElement.widget), isFalse);
-    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // Test requires --track-widget-creation flag.
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
+
+    testWidgets('debugIsWidgetLocalCreation test', (WidgetTester tester) async {
+      setupDefaultPubRootDirectory(service);
+
+      final GlobalKey key = GlobalKey();
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            child: Text('target', key: key, textDirection: TextDirection.ltr),
+          ),
+        ),
+      );
+
+      final Element element = key.currentContext! as Element;
+      expect(debugIsWidgetLocalCreation(element.widget), isTrue);
+
+      final Finder paddingFinder = find.byType(Padding);
+      final Element paddingElement = paddingFinder.evaluate().first;
+      expect(debugIsWidgetLocalCreation(paddingElement.widget), isFalse);
+    }, skip: !WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --track-widget-creation flag.
+
+    testWidgets('debugIsWidgetLocalCreation false test', (WidgetTester tester) async {
+      final GlobalKey key = GlobalKey();
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            child: Text('target', key: key, textDirection: TextDirection.ltr),
+          ),
+        ),
+      );
+
+      final Element element = key.currentContext! as Element;
+      expect(debugIsWidgetLocalCreation(element.widget), isFalse);
+    }, skip: WidgetInspectorService.instance.isWidgetCreationTracked()); // [intended] Test requires --no-track-widget-creation flag.
 
     test('devToolsInspectorUri test', () {
       activeDevToolsServerAddress = 'http://127.0.0.1:9100';
@@ -3025,7 +4956,7 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
     });
   }
 
-  static void setupDefaultPubRootDirectory(TestWidgetInspectorService service) {
+  static String generateTestPubRootDirectory(TestWidgetInspectorService service) {
     final Map<String, Object?> jsonObject = const SizedBox().toDiagnosticsNode().toJsonMap(InspectorSerializationDelegate(service: service));
     final Map<String, Object?> creationLocation = jsonObject['creationLocation']! as Map<String, Object?>;
     expect(creationLocation, isNotNull);
@@ -3034,28 +4965,48 @@ class _TestWidgetInspectorService extends TestWidgetInspectorService {
     final List<String> segments = Uri
         .parse(file)
         .pathSegments;
-    final String pubRootTest = '/' +
-        segments.take(segments.length - 2).join('/');
 
     // Strip a couple subdirectories away to generate a plausible pub root
     // directory.
-    service.setPubRootDirectories(<String>[pubRootTest]);
+    final String pubRootTest = '/${segments.take(segments.length - 2).join('/')}';
+
+    return pubRootTest;
+  }
+
+  static void setupDefaultPubRootDirectory(TestWidgetInspectorService service) {
+    service.resetPubRootDirectories();
+    service
+        .addPubRootDirectories(<String>[generateTestPubRootDirectory(service)]);
   }
 }
 
 void _addToKnownLocationsMap({
   required Map<int, _CreationLocation> knownLocations,
-  required Map<String, List<int>> newLocations,
+  required Map<String, Map<String, List<Object?>>> newLocations,
 }) {
-  newLocations.forEach((String file, List<int> entries) {
-    assert(entries.length % 3 == 0);
-    for (int i = 0; i < entries.length; i += 3) {
-      final int id = entries[i];
-      final int line = entries[i + 1];
-      final int column = entries[i + 2];
-      assert(!knownLocations.containsKey(id));
-      knownLocations[id] =
-          _CreationLocation(file: file, line: line, column: column, id: id);
+  newLocations.forEach((String file, Map<String, List<Object?>> entries) {
+    final List<int> ids = entries['ids']!.cast<int>();
+    final List<int> lines = entries['lines']!.cast<int>();
+    final List<int> columns = entries['columns']!.cast<int>();
+    final List<String> names = entries['names']!.cast<String>();
+
+    for (int i = 0; i < ids.length; i++) {
+      final int id = ids[i];
+      knownLocations[id] = _CreationLocation(
+        id: id,
+        file: file,
+        line: lines[i],
+        column: columns[i],
+        name: names[i],
+      );
     }
   });
+}
+
+extension WidgetInspectorServiceExtension on WidgetInspectorService {
+  Future<List<String>> get currentPubRootDirectories async {
+    return ((await pubRootDirectories(
+        <String, String>{},
+      ))['result'] as List<Object?>).cast<String>();
+  }
 }

@@ -58,7 +58,7 @@ void _tests() {
       .split('\n')
       .map<String>((String line) => line.trim())
       .join('\n')
-      .trim() + ',';
+      .trim();
 
     File? findThisTestFile(Directory directory) {
       for (final FileSystemEntity entity in directory.listSync()) {
@@ -86,7 +86,7 @@ void _tests() {
       .join('\n')
       .trim();
     semantics.dispose();
-    expect(code, expectedCode);
+    expect('$code,', expectedCode);
   });
 
   testWidgets('generated code is correct', (WidgetTester tester) async {
@@ -132,7 +132,7 @@ void _tests() {
                                   tags: <SemanticsTag>[const SemanticsTag('RenderViewport.twoPane')],
                                   flags: <SemanticsFlag>[SemanticsFlag.hasCheckedState, SemanticsFlag.isChecked, SemanticsFlag.isSelected],
                                   actions: <SemanticsAction>[SemanticsAction.tap, SemanticsAction.decrease],
-                                  label: '‪Interactive text‬',
+                                  label: '\u202aInteractive text\u202c',
                                   value: 'test-value',
                                   increasedValue: 'test-increasedValue',
                                   decreasedValue: 'test-decreasedValue',

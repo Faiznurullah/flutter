@@ -56,8 +56,9 @@ List<Widget> generateList(Widget child, { required bool impliedMode }) {
         key: GlobalObjectKey<_LeafState>(index),
         child: child,
       );
-      if (impliedMode)
+      if (impliedMode) {
         return result;
+      }
       return AutomaticKeepAlive(child: result);
     },
     growable: false,
@@ -446,7 +447,7 @@ void main() {
           AutomaticKeepAlive(
             child: SizedBox(
               height: 400.0,
-              child: Stack(children: const <Widget>[]),
+              child: Stack(),
             ),
           ),
           AutomaticKeepAlive(

@@ -164,11 +164,14 @@ class ChromiumLauncher {
   /// port is picked automatically.
   ///
   /// [skipCheck] does not attempt to make a devtools connection before returning.
+  ///
+  /// [webBrowserFlags] add arbitrary browser flags.
   Future<Chromium> launch(String url, {
     bool headless = false,
     int? debugPort,
     bool skipCheck = false,
     Directory? cacheDir,
+    List<String> webBrowserFlags = const <String>[],
   }) async {
     if (currentCompleter.isCompleted) {
       throwToolExit('Only one instance of chrome can be started.');
@@ -215,6 +218,7 @@ class ChromiumLauncher {
           '--no-sandbox',
           '--window-size=2400,1800',
         ],
+      ...webBrowserFlags,
       url,
     ];
 
@@ -226,7 +230,7 @@ class ChromiumLauncher {
         _cacheUserSessionInformation(userDataDir, cacheDir);
       }));
     }
-    return _connect(Chromium(
+    return connect(Chromium(
       port,
       ChromeConnection('localhost', port),
       url: url,
@@ -236,7 +240,7 @@ class ChromiumLauncher {
   }
 
   Future<Process?> _spawnChromiumProcess(List<String> args, String chromeExecutable) async {
-    if (_operatingSystemUtils.hostPlatform == HostPlatform.darwin_arm) {
+    if (_operatingSystemUtils.hostPlatform == HostPlatform.darwin_arm64) {
       final ProcessResult result = _processManager.runSync(<String>['file', chromeExecutable]);
       // Check if ARM Chrome is installed.
       // Mach-O 64-bit executable arm64
@@ -249,7 +253,9 @@ class ChromiumLauncher {
 
     // Keep attempting to launch the browser until one of:
     // - Chrome launched successfully, in which case we just return from the loop.
-    // - The tool detected an unretriable Chrome error, in which case we throw ToolExit.
+    // - The tool reached the maximum retry count, in which case we throw ToolExit.
+    const int kMaxRetries = 3;
+    int retry = 0;
     while (true) {
       final Process process = await _processManager.start(args);
 
@@ -263,13 +269,17 @@ class ChromiumLauncher {
       // Wait until the DevTools are listening before trying to connect. This is
       // only required for flutter_test --platform=chrome and not flutter run.
       bool hitGlibcBug = false;
+      bool shouldRetry = false;
+      final List<String> errors = <String>[];
       await process.stderr
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .map((String line) {
-          _logger.printTrace('[CHROME]:$line');
+          _logger.printTrace('[CHROME]: $line');
+          errors.add('[CHROME]:$line');
           if (line.contains(_kGlibcError)) {
             hitGlibcBug = true;
+            shouldRetry = true;
           }
           return line;
         })
@@ -282,17 +292,23 @@ class ChromiumLauncher {
             // Return value unused.
             return '';
           }
-          _logger.printTrace('Failed to launch browser. Command used to launch it: ${args.join(' ')}');
-          throw ToolExit(
-            'Failed to launch browser. Make sure you are using an up-to-date '
-            'Chrome or Edge. Otherwise, consider using -d web-server instead '
-            'and filing an issue at https://github.com/flutter/flutter/issues.',
-          );
+          if (retry >= kMaxRetries) {
+            errors.forEach(_logger.printError);
+            _logger.printError('Failed to launch browser after $kMaxRetries tries. Command used to launch it: ${args.join(' ')}');
+            throw ToolExit(
+              'Failed to launch browser. Make sure you are using an up-to-date '
+              'Chrome or Edge. Otherwise, consider using -d web-server instead '
+              'and filing an issue at https://github.com/flutter/flutter/issues.',
+            );
+          }
+          shouldRetry = true;
+          return '';
         });
 
-      if (!hitGlibcBug) {
+      if (!hitGlibcBug && !shouldRetry) {
         return process;
       }
+      retry += 1;
 
       // A precaution that avoids accumulating browser processes, in case the
       // glibc bug doesn't cause the browser to quit and we keep looping and
@@ -381,20 +397,54 @@ class ChromiumLauncher {
            !directory.path.endsWith('GPUCache');
   }
 
-  Future<Chromium> _connect(Chromium chrome, bool skipCheck) async {
+  /// Connect to the [chrome] instance, testing the connection if
+  /// [skipCheck] is set to false.
+  @visibleForTesting
+  Future<Chromium> connect(Chromium chrome, bool skipCheck) async {
     // The connection is lazy. Try a simple call to make sure the provided
     // connection is valid.
     if (!skipCheck) {
       try {
-        await chrome.chromeConnection.getTabs();
-      } on Exception catch (e) {
+        await _getFirstTab(chrome);
+      } on Exception catch (error, stackTrace) {
+        _logger.printError('$error', stackTrace: stackTrace);
         await chrome.close();
         throwToolExit(
-            'Unable to connect to Chrome debug port: ${chrome.debugPort}\n $e');
+            'Unable to connect to Chrome debug port: ${chrome.debugPort}\n $error');
       }
     }
     currentCompleter.complete(chrome);
     return chrome;
+  }
+
+  /// Gets the first [chrome] tab.
+  ///
+  /// Note: Retry getting tabs from Chrome for a few seconds and retry finding
+  /// the tab a few times. This prevents flakes caused by Chrome not returning
+  /// correct output if the call was too close to the start.
+  Future<ChromeTab?> _getFirstTab(Chromium chrome) async {
+    const Duration retryFor = Duration(seconds: 2);
+    const int attempts = 5;
+
+    for (int i = 1; i <= attempts; i++) {
+      try {
+        final List<ChromeTab> tabs =
+          await chrome.chromeConnection.getTabs(retryFor: retryFor);
+
+        if (tabs.isNotEmpty) {
+          return tabs.first;
+        }
+        if (i == attempts) {
+          return null;
+        }
+      } on ConnectionException catch (_) {
+        if (i == attempts) {
+          rethrow;
+        }
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    return null;
   }
 
   Future<Chromium> get connectedInstance => currentCompleter.future;

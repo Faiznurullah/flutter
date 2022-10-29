@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,7 +53,7 @@ void main() {
     expect(find.text('About box'), findsNothing);
 
     await tester.tap(find.byType(IconButton));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     expect(find.text('About Pirate app'), findsOneWidget);
     expect(find.text('0.1.2'), findsNothing);
@@ -63,7 +65,7 @@ void main() {
     expect(find.text('About box'), findsNothing);
 
     await tester.tap(find.text('About Pirate app'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     expect(find.text('About Pirate app'), findsOneWidget);
     expect(find.text('0.1.2'), findsOneWidget);
@@ -81,7 +83,7 @@ void main() {
     });
 
     await tester.tap(find.text('VIEW LICENSES'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     expect(find.text('Pirate app'), findsOneWidget);
     expect(find.text('0.1.2'), findsOneWidget);
@@ -91,9 +93,9 @@ void main() {
       findsOneWidget,
     );
     await tester.tap(find.text('Pirate package '));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.text('Pirate license'), findsOneWidget);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('About box logic defaults to executable name for app name', (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -142,7 +144,7 @@ void main() {
 
     // Check license is displayed after entering into license page for 'AAA'.
     await tester.tap(find.text('AAA'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.text('BBB'), findsOneWidget);
 
     /// Go back to list of packages.
@@ -152,9 +154,9 @@ void main() {
     /// Check license is displayed after entering into license page for
     /// 'Another package'.
     await tester.tap(find.text('Another package'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.text('Another license'), findsOneWidget);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('LicensePage control test with all properties', (WidgetTester tester) async {
     const FlutterLogo logo = FlutterLogo();
@@ -218,7 +220,7 @@ void main() {
 
     // Check license is displayed after entering into license page for 'AAA'.
     await tester.tap(find.text('AAA'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.text('BBB'), findsOneWidget);
 
     /// Go back to list of packages.
@@ -228,9 +230,9 @@ void main() {
     /// Check license is displayed after entering into license page for
     /// 'Another package'.
     await tester.tap(find.text('Another package'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.text('Another license'), findsOneWidget);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('_PackageLicensePage title style without AppBarTheme', (WidgetTester tester) async {
     LicenseRegistry.addLicense(() {
@@ -254,8 +256,8 @@ void main() {
       MaterialApp(
         theme: ThemeData(
           primaryTextTheme: const TextTheme(
-            headline6: titleTextStyle,
-            subtitle2: subtitleTextStyle,
+            titleLarge: titleTextStyle,
+            titleSmall: subtitleTextStyle,
           ),
         ),
         home: const Center(
@@ -270,14 +272,14 @@ void main() {
 
     // Check license is displayed after entering into license page for 'AAA'.
     await tester.tap(find.text('AAA'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     // Check for titles style.
     final Text title = tester.widget(find.text('AAA'));
     expect(title.style, titleTextStyle);
     final Text subtitle = tester.widget(find.text('1 license.'));
     expect(subtitle.style, subtitleTextStyle);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('_PackageLicensePage title style with AppBarTheme', (WidgetTester tester) async {
     LicenseRegistry.addLicense(() {
@@ -288,11 +290,11 @@ void main() {
 
     const TextStyle titleTextStyle = TextStyle(
       fontSize: 20,
-      color: Colors.black,
+      color: Colors.indigo,
     );
     const TextStyle subtitleTextStyle = TextStyle(
       fontSize: 15,
-      color: Colors.red,
+      color: Colors.indigo,
     );
 
     await tester.pumpWidget(
@@ -300,20 +302,21 @@ void main() {
         theme: ThemeData(
           // Not used because appBarTheme is prioritized.
           primaryTextTheme: const TextTheme(
-            headline6: TextStyle(
+            titleLarge: TextStyle(
               fontSize: 12,
               color: Colors.grey,
             ),
-            subtitle2: TextStyle(
+            titleSmall: TextStyle(
               fontSize: 10,
               color: Colors.grey,
             ),
           ),
           appBarTheme: const AppBarTheme(
             textTheme: TextTheme(
-              headline6: titleTextStyle,
-              subtitle2: subtitleTextStyle,
+              titleLarge: titleTextStyle,
+              titleSmall: subtitleTextStyle,
             ),
+            foregroundColor: Colors.indigo,
           ),
         ),
         home: const Center(
@@ -328,14 +331,14 @@ void main() {
 
     // Check license is displayed after entering into license page for 'AAA'.
     await tester.tap(find.text('AAA'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     // Check for titles style.
     final Text title = tester.widget(find.text('AAA'));
     expect(title.style, titleTextStyle);
     final Text subtitle = tester.widget(find.text('1 license.'));
     expect(subtitle.style, subtitleTextStyle);
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('LicensePage respects the notch', (WidgetTester tester) async {
     const double safeareaPadding = 27.0;
@@ -365,7 +368,7 @@ void main() {
       tester.getTopLeft(find.text('Licenses')),
       const Offset(16.0 + safeareaPadding, 18.0 + safeareaPadding),
     );
-  }, skip: isBrowser); // https://github.com/flutter/flutter/issues/54385
+  });
 
   testWidgets('LicensePage returns early if unmounted', (WidgetTester tester) async {
     final Completer<LicenseEntry> licenseCompleter = Completer<LicenseEntry>();
@@ -591,6 +594,135 @@ void main() {
     expect(nestedObserver.dialogCount, 1);
   });
 
+  group('showAboutDialog avoids overlapping display features', () {
+    testWidgets('default positioning', (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        builder: (BuildContext context, Widget? child) {
+          return MediaQuery(
+            // Display has a vertical hinge down the middle
+            data: const MediaQueryData(
+              size: Size(800, 600),
+              displayFeatures: <DisplayFeature>[
+                DisplayFeature(
+                  bounds: Rect.fromLTRB(390, 0, 410, 600),
+                  type: DisplayFeatureType.hinge,
+                  state: DisplayFeatureState.unknown,
+                ),
+              ],
+            ),
+            child: child!,
+          );
+        },
+        home: Builder(
+          builder: (BuildContext context) => ElevatedButton(
+            onPressed: () {
+              showAboutDialog(
+                context: context,
+                useRootNavigator: false,
+                applicationName: 'A',
+              );
+            },
+            child: const Text('Show About Dialog'),
+          ),
+        ),
+      ));
+
+      // Open the dialog.
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+
+      // By default it should place the dialog on the left screen
+      expect(tester.getTopLeft(find.byType(AboutDialog)), Offset.zero);
+      expect(tester.getBottomRight(find.byType(AboutDialog)), const Offset(390.0, 600.0));
+    });
+
+    testWidgets('positioning using anchorPoint', (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        builder: (BuildContext context, Widget? child) {
+          return MediaQuery(
+            // Display has a vertical hinge down the middle
+            data: const MediaQueryData(
+              size: Size(800, 600),
+              displayFeatures: <DisplayFeature>[
+                DisplayFeature(
+                  bounds: Rect.fromLTRB(390, 0, 410, 600),
+                  type: DisplayFeatureType.hinge,
+                  state: DisplayFeatureState.unknown,
+                ),
+              ],
+            ),
+            child: child!,
+          );
+        },
+        home: Builder(
+          builder: (BuildContext context) => ElevatedButton(
+            onPressed: () {
+              showAboutDialog(
+                context: context,
+                useRootNavigator: false,
+                applicationName: 'A',
+                anchorPoint: const Offset(1000, 0),
+              );
+            },
+            child: const Text('Show About Dialog'),
+          ),
+        ),
+      ));
+
+      // Open the dialog.
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+
+      // The anchorPoint hits the right side of the display
+      expect(tester.getTopLeft(find.byType(AboutDialog)), const Offset(410.0, 0.0));
+      expect(tester.getBottomRight(find.byType(AboutDialog)), const Offset(800.0, 600.0));
+    });
+
+    testWidgets('positioning using Directionality', (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        builder: (BuildContext context, Widget? child) {
+          return MediaQuery(
+            // Display has a vertical hinge down the middle
+            data: const MediaQueryData(
+              size: Size(800, 600),
+              displayFeatures: <DisplayFeature>[
+                DisplayFeature(
+                  bounds: Rect.fromLTRB(390, 0, 410, 600),
+                  type: DisplayFeatureType.hinge,
+                  state: DisplayFeatureState.unknown,
+                ),
+              ],
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: child!,
+            ),
+          );
+        },
+        home: Builder(
+          builder: (BuildContext context) => ElevatedButton(
+            onPressed: () {
+              showAboutDialog(
+                context: context,
+                useRootNavigator: false,
+                applicationName: 'A',
+              );
+            },
+            child: const Text('Show About Dialog'),
+          ),
+        ),
+      ));
+
+      // Open the dialog.
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+
+      // Since this is rtl, the first screen is the on the right
+      expect(tester.getTopLeft(find.byType(AboutDialog)), const Offset(410.0, 0.0));
+      expect(tester.getBottomRight(find.byType(AboutDialog)), const Offset(800.0, 600.0));
+    });
+  });
+
   testWidgets("AboutListTile's child should not be offset when the icon is not specified.", (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -704,6 +836,126 @@ void main() {
     expect(materialDones.length, equals(3));
     expect(materialDones[0].color, scaffoldColor);
     expect(materialDones[1].color, cardColor);
+  });
+
+  testWidgets('Conflicting scrollbars are not applied by ScrollBehavior to _PackageLicensePage', (WidgetTester tester) async {
+    // Regression test for https://github.com/flutter/flutter/issues/83819
+    LicenseRegistry.addLicense(() {
+      return Stream<LicenseEntry>.fromIterable(<LicenseEntry>[
+        const LicenseEntryWithLineBreaks(<String>['AAA'], 'BBB'),
+      ]);
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: LicensePage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Check for packages.
+    expect(find.text('AAA'), findsOneWidget);
+    // Check license is displayed after entering into license page for 'AAA'.
+    await tester.tap(find.text('AAA'));
+    await tester.pumpAndSettle();
+
+    // The inherited ScrollBehavior should not apply Scrollbars since they are
+    // already built in to the widget.
+    switch (debugDefaultTargetPlatformOverride) {
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        expect(find.byType(CupertinoScrollbar), findsNothing);
+        break;
+      case TargetPlatform.iOS:
+        expect(find.byType(CupertinoScrollbar), findsOneWidget);
+        break;
+      case null:
+        break;
+    }
+    expect(find.byType(Scrollbar), findsOneWidget);
+    expect(find.byType(RawScrollbar), findsNothing);
+
+  }, variant: TargetPlatformVariant.all());
+
+  testWidgets('LicensePage padding', (WidgetTester tester) async {
+    const FlutterLogo logo = FlutterLogo();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        title: 'Pirate app',
+        home: Center(
+          child: LicensePage(
+            applicationName: 'LicensePage test app',
+            applicationIcon: logo,
+            applicationVersion: '0.1.2',
+            applicationLegalese: 'I am the very model of a modern major general.',
+          ),
+        ),
+      ),
+    );
+
+    final Finder appName = find.text('LicensePage test app');
+    final Finder appIcon = find.byType(FlutterLogo);
+    final Finder appVersion = find.text('0.1.2');
+    final Finder appLegalese = find.text('I am the very model of a modern major general.');
+    final Finder appPowered = find.text('Powered by Flutter');
+
+    expect(appName, findsOneWidget);
+    expect(appIcon, findsOneWidget);
+    expect(appVersion, findsOneWidget);
+    expect(appLegalese, findsOneWidget);
+    expect(appPowered, findsOneWidget);
+
+    // Bottom padding is applied to the app version and app legalese text.
+    final double appNameBottomPadding = tester.getTopLeft(appIcon).dy - tester.getBottomLeft(appName).dy;
+    expect(appNameBottomPadding, 0.0);
+
+    final double appIconBottomPadding = tester.getTopLeft(appVersion).dy - tester.getBottomLeft(appIcon).dy;
+    expect(appIconBottomPadding, 0.0);
+
+    final double appVersionBottomPadding = tester.getTopLeft(appLegalese).dy - tester.getBottomLeft(appVersion).dy;
+    expect(appVersionBottomPadding, 18.0);
+
+    final double appLegaleseBottomPadding = tester.getTopLeft(appPowered).dy - tester.getBottomLeft(appLegalese).dy;
+    expect(appLegaleseBottomPadding, 18.0);
+  });
+
+  testWidgets('LicensePage has no extra padding between app icon and app powered text', (WidgetTester tester) async {
+    // This is a regression test for https://github.com/flutter/flutter/issues/99559
+
+    const FlutterLogo logo = FlutterLogo();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        title: 'Pirate app',
+        home: Center(
+          child: LicensePage(
+            applicationIcon: logo,
+          ),
+        ),
+      ),
+    );
+
+    final Finder appName = find.text('LicensePage test app');
+    final Finder appIcon = find.byType(FlutterLogo);
+    final Finder appVersion = find.text('0.1.2');
+    final Finder appLegalese = find.text('I am the very model of a modern major general.');
+    final Finder appPowered = find.text('Powered by Flutter');
+
+    expect(appName, findsNothing);
+    expect(appIcon, findsOneWidget);
+    expect(appVersion, findsNothing);
+    expect(appLegalese, findsNothing);
+    expect(appPowered, findsOneWidget);
+
+    // Padding between app icon and app powered text.
+    final double appIconBottomPadding = tester.getTopLeft(appPowered).dy - tester.getBottomLeft(appIcon).dy;
+    expect(appIconBottomPadding, 18.0);
   });
 }
 

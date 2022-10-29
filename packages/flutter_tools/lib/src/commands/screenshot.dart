@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:vm_service/vm_service.dart' as vm_service;
 
 import '../base/common.dart';
 import '../base/file_system.dart';
 import '../convert.dart';
 import '../device.dart';
-import '../globals_null_migrated.dart' as globals;
+import '../globals.dart' as globals;
 import '../runner/flutter_command.dart';
 import '../vmservice.dart';
 
@@ -22,7 +20,7 @@ const String _kSkiaType = 'skia';
 const String _kRasterizerType = 'rasterizer';
 
 class ScreenshotCommand extends FlutterCommand {
-  ScreenshotCommand() {
+  ScreenshotCommand({required this.fs}) {
     argParser.addOption(
       _kOut,
       abbr: 'o',
@@ -55,6 +53,8 @@ class ScreenshotCommand extends FlutterCommand {
     usesDeviceTimeoutOption();
   }
 
+  final FileSystem fs;
+
   @override
   String get name => 'screenshot';
 
@@ -62,11 +62,14 @@ class ScreenshotCommand extends FlutterCommand {
   String get description => 'Take a screenshot from a connected device.';
 
   @override
+  final String category = FlutterCommandCategory.tools;
+
+  @override
   final List<String> aliases = <String>['pic'];
 
-  Device device;
+  Device? device;
 
-  Future<void> _validateOptions(String screenshotType, String observatoryUrl) async {
+  Future<void> _validateOptions(String? screenshotType, String? observatoryUrl) async {
     switch (screenshotType) {
       case _kDeviceType:
         if (observatoryUrl != null) {
@@ -76,8 +79,8 @@ class ScreenshotCommand extends FlutterCommand {
         if (device == null) {
           throwToolExit('Must have a connected device for screenshot type $screenshotType');
         }
-        if (!device.supportsScreenshot) {
-          throwToolExit('Screenshot not supported for ${device.name}.');
+        if (!device!.supportsScreenshot) {
+          throwToolExit('Screenshot not supported for ${device!.name}.');
         }
         break;
       default:
@@ -91,20 +94,20 @@ class ScreenshotCommand extends FlutterCommand {
   }
 
   @override
-  Future<FlutterCommandResult> verifyThenRunCommand(String commandPath) async {
-    await _validateOptions(stringArg(_kType), stringArg(_kObservatoryUrl));
+  Future<FlutterCommandResult> verifyThenRunCommand(String? commandPath) async {
+    await _validateOptions(stringArgDeprecated(_kType), stringArgDeprecated(_kObservatoryUrl));
     return super.verifyThenRunCommand(commandPath);
   }
 
   @override
   Future<FlutterCommandResult> runCommand() async {
-    File outputFile;
-    if (argResults.wasParsed(_kOut)) {
-      outputFile = globals.fs.file(stringArg(_kOut));
+    File? outputFile;
+    if (argResults?.wasParsed(_kOut) ?? false) {
+      outputFile = fs.file(stringArgDeprecated(_kOut));
     }
 
     bool success = true;
-    switch (stringArg(_kType)) {
+    switch (stringArgDeprecated(_kType)) {
       case _kDeviceType:
         await runScreenshot(outputFile);
         break;
@@ -120,24 +123,35 @@ class ScreenshotCommand extends FlutterCommand {
                    : FlutterCommandResult.fail();
   }
 
-  Future<void> runScreenshot(File outputFile) async {
+  Future<void> runScreenshot(File? outputFile) async {
     outputFile ??= globals.fsUtils.getUniqueFile(
-      globals.fs.currentDirectory,
+      fs.currentDirectory,
       'flutter',
       'png',
     );
+
     try {
-      await device.takeScreenshot(outputFile);
+      await device!.takeScreenshot(outputFile);
     } on Exception catch (error) {
       throwToolExit('Error taking screenshot: $error');
     }
-    _showOutputFileInfo(outputFile);
+
+    checkOutput(outputFile, fs);
+
+    try {
+      _showOutputFileInfo(outputFile);
+    } on Exception catch (error) {
+      throwToolExit(
+        'Error with provided file path: "${outputFile.path}"\n'
+        'Error: $error'
+      );
+    }
   }
 
-  Future<bool> runSkia(File outputFile) async {
-    final Uri observatoryUrl = Uri.parse(stringArg(_kObservatoryUrl));
+  Future<bool> runSkia(File? outputFile) async {
+    final Uri observatoryUrl = Uri.parse(stringArgDeprecated(_kObservatoryUrl)!);
     final FlutterVmService vmService = await connectToVmService(observatoryUrl, logger: globals.logger);
-    final vm_service.Response skp = await vmService.screenshotSkp();
+    final vm_service.Response? skp = await vmService.screenshotSkp();
     if (skp == null) {
       globals.printError(
         'The Skia picture request failed, probably because the device was '
@@ -146,22 +160,22 @@ class ScreenshotCommand extends FlutterCommand {
       return false;
     }
     outputFile ??= globals.fsUtils.getUniqueFile(
-      globals.fs.currentDirectory,
+      fs.currentDirectory,
       'flutter',
       'skp',
     );
     final IOSink sink = outputFile.openWrite();
-    sink.add(base64.decode(skp.json['skp'] as String));
+    sink.add(base64.decode(skp.json?['skp'] as String));
     await sink.close();
     _showOutputFileInfo(outputFile);
     _ensureOutputIsNotJsonRpcError(outputFile);
     return true;
   }
 
-  Future<bool> runRasterizer(File outputFile) async {
-    final Uri observatoryUrl = Uri.parse(stringArg(_kObservatoryUrl));
+  Future<bool> runRasterizer(File? outputFile) async {
+    final Uri observatoryUrl = Uri.parse(stringArgDeprecated(_kObservatoryUrl)!);
     final FlutterVmService vmService = await connectToVmService(observatoryUrl, logger: globals.logger);
-    final vm_service.Response response = await vmService.screenshot();
+    final vm_service.Response? response = await vmService.screenshot();
     if (response == null) {
       globals.printError(
         'The screenshot request failed, probably because the device was '
@@ -170,16 +184,25 @@ class ScreenshotCommand extends FlutterCommand {
       return false;
     }
     outputFile ??= globals.fsUtils.getUniqueFile(
-      globals.fs.currentDirectory,
+      fs.currentDirectory,
       'flutter',
       'png',
     );
     final IOSink sink = outputFile.openWrite();
-    sink.add(base64.decode(response.json['screenshot'] as String));
+    sink.add(base64.decode(response.json?['screenshot'] as String));
     await sink.close();
     _showOutputFileInfo(outputFile);
     _ensureOutputIsNotJsonRpcError(outputFile);
     return true;
+  }
+
+  static void checkOutput(File outputFile, FileSystem fs) {
+    if (!fs.file(outputFile.path).existsSync()) {
+      throwToolExit(
+          'File was not created, ensure path is valid\n'
+          'Path provided: "${outputFile.path}"'
+      );
+    }
   }
 
   void _ensureOutputIsNotJsonRpcError(File outputFile) {
@@ -196,6 +219,6 @@ class ScreenshotCommand extends FlutterCommand {
 
   void _showOutputFileInfo(File outputFile) {
     final int sizeKB = (outputFile.lengthSync()) ~/ 1024;
-    globals.printStatus('Screenshot written to ${globals.fs.path.relative(outputFile.path)} (${sizeKB}kB).');
+    globals.printStatus('Screenshot written to ${fs.path.relative(outputFile.path)} (${sizeKB}kB).');
   }
 }

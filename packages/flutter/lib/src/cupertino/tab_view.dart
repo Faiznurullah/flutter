@@ -41,7 +41,7 @@ import 'route.dart';
 class CupertinoTabView extends StatefulWidget {
   /// Creates the content area for a tab in a [CupertinoTabScaffold].
   const CupertinoTabView({
-    Key? key,
+    super.key,
     this.builder,
     this.navigatorKey,
     this.defaultTitle,
@@ -50,8 +50,7 @@ class CupertinoTabView extends StatefulWidget {
     this.onUnknownRoute,
     this.navigatorObservers = const <NavigatorObserver>[],
     this.restorationScopeId,
-  }) : assert(navigatorObservers != null),
-       super(key: key);
+  }) : assert(navigatorObservers != null);
 
   /// The widget builder for the default route of the tab view
   /// ([Navigator.defaultRouteName], which is `/`).
@@ -89,8 +88,9 @@ class CupertinoTabView extends StatefulWidget {
   ///
   /// When a named route is pushed with [Navigator.pushNamed] inside this tab view,
   /// the route name is looked up in this map. If the name is present,
-  /// the associated [WidgetBuilder] is used to construct a [CupertinoPageRoute]
-  /// that performs an appropriate transition to the new route.
+  /// the associated [widgets.WidgetBuilder] is used to construct a
+  /// [CupertinoPageRoute] that performs an appropriate transition to the new
+  /// route.
   ///
   /// If the tab view only has one page, then you can specify it using [builder] instead.
   ///
@@ -158,7 +158,7 @@ class _CupertinoTabViewState extends State<CupertinoTabView> {
 
   void _updateObservers() {
     _navigatorObservers =
-        List<NavigatorObserver>.from(widget.navigatorObservers)
+        List<NavigatorObserver>.of(widget.navigatorObservers)
           ..add(_heroController);
   }
 
@@ -190,8 +190,9 @@ class _CupertinoTabViewState extends State<CupertinoTabView> {
         settings: settings,
       );
     }
-    if (widget.onGenerateRoute != null)
+    if (widget.onGenerateRoute != null) {
       return widget.onGenerateRoute!(settings);
+    }
     return null;
   }
 

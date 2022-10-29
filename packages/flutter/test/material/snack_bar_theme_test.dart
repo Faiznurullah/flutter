@@ -21,9 +21,22 @@ void main() {
     expect(snackBarTheme.elevation, null);
     expect(snackBarTheme.shape, null);
     expect(snackBarTheme.behavior, null);
+    expect(snackBarTheme.width, null);
   });
 
-  testWidgets('Default SnackBarThemeData debugFillProperties', (WidgetTester tester) async {
+  test(
+      'SnackBarTheme throws assertion if width is provided with fixed behaviour',
+      () {
+    expect(
+        () => SnackBarThemeData(
+              behavior: SnackBarBehavior.fixed,
+              width: 300.0,
+            ),
+        throwsAssertionError);
+  });
+
+  testWidgets('Default SnackBarThemeData debugFillProperties',
+      (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
     const SnackBarThemeData().debugFillProperties(builder);
 
@@ -37,14 +50,15 @@ void main() {
 
   testWidgets('SnackBarThemeData implements debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
-    SnackBarThemeData(
-      backgroundColor: const Color(0xFFFFFFFF),
-      actionTextColor: const Color(0xFF0000AA),
-      disabledActionTextColor: const Color(0xFF00AA00),
-      contentTextStyle: const TextStyle(color: Color(0xFF123456)),
+    const SnackBarThemeData(
+      backgroundColor: Color(0xFFFFFFFF),
+      actionTextColor: Color(0xFF0000AA),
+      disabledActionTextColor: Color(0xFF00AA00),
+      contentTextStyle: TextStyle(color: Color(0xFF123456)),
       elevation: 2.0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2.0)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(2.0))),
       behavior: SnackBarBehavior.floating,
+      width: 400.0,
     ).debugFillProperties(builder);
 
     final List<String> description = builder.properties
@@ -58,8 +72,9 @@ void main() {
       'disabledActionTextColor: Color(0xff00aa00)',
       'contentTextStyle: TextStyle(inherit: true, color: Color(0xff123456))',
       'elevation: 2.0',
-      'shape: RoundedRectangleBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), BorderRadius.circular(2.0))',
+      'shape: RoundedRectangleBorder(BorderSide(width: 0.0, style: none), BorderRadius.circular(2.0))',
       'behavior: SnackBarBehavior.floating',
+      'width: 400.0',
     ]);
   });
 
@@ -91,7 +106,7 @@ void main() {
     final Material material = _getSnackBarMaterial(tester);
     final RenderParagraph content = _getSnackBarTextRenderObject(tester, text);
 
-    expect(content.text.style, Typography.material2018().white.subtitle1);
+    expect(content.text.style, Typography.material2018().white.titleMedium);
     expect(material.color, const Color(0xFF333333));
     expect(material.elevation, 6.0);
     expect(material.shape, null);
@@ -145,6 +160,7 @@ void main() {
     const ShapeBorder shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(9.0)),
     );
+    const double snackBarWidth = 400.0;
 
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData(snackBarTheme: _snackBarTheme()),
@@ -155,6 +171,8 @@ void main() {
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   backgroundColor: backgroundColor,
+                  behavior: SnackBarBehavior.floating,
+                  width: snackBarWidth,
                   elevation: elevation,
                   shape: shape,
                   content: const Text('I am a snack bar.'),
@@ -177,13 +195,20 @@ void main() {
     await tester.pump(); // start animation
     await tester.pump(const Duration(milliseconds: 750));
 
+    final Finder materialFinder = _getSnackBarMaterialFinder(tester);
     final Material material = _getSnackBarMaterial(tester);
-    final RenderParagraph button = _getSnackBarActionTextRenderObject(tester, action);
+    final RenderParagraph button =
+        _getSnackBarActionTextRenderObject(tester, action);
 
     expect(material.color, backgroundColor);
     expect(material.elevation, elevation);
     expect(material.shape, shape);
     expect(button.text.style!.color, textColor);
+    // Assert width.
+    final Offset snackBarBottomLeft = tester.getBottomLeft(materialFinder.first);
+    final Offset snackBarBottomRight = tester.getBottomRight(materialFinder.first);
+    expect(snackBarBottomLeft.dx, (800 - snackBarWidth) / 2); // Device width is 800.
+    expect(snackBarBottomRight.dx, (800 + snackBarWidth) / 2); // Device width is 800.
   });
 
   testWidgets('SnackBar theme behavior is correct for floating', (WidgetTester tester) async {
@@ -271,24 +296,120 @@ void main() {
     expect(floatingActionButtonOriginBottomCenter.dy > floatingActionButtonBottomCenter.dy, true);
     expect(snackBarTopCenter.dy > floatingActionButtonBottomCenter.dy, true);
   });
+
+  Widget buildApp({
+    required SnackBarBehavior themedBehavior,
+    EdgeInsetsGeometry? margin,
+    double? width,
+  }) {
+    return MaterialApp(
+      theme: ThemeData(
+        snackBarTheme: SnackBarThemeData(behavior: themedBehavior),
+      ),
+      home: Scaffold(
+        floatingActionButton: FloatingActionButton(
+          child: const Icon(Icons.send),
+          onPressed: () {},
+        ),
+        body: Builder(
+          builder: (BuildContext context) {
+            return GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  margin: margin,
+                  width: width,
+                  content: const Text('I am a snack bar.'),
+                  duration: const Duration(seconds: 2),
+                  action: SnackBarAction(label: 'ACTION', onPressed: () {}),
+                ));
+              },
+              child: const Text('X'),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  testWidgets('SnackBar theme behavior will assert properly for margin use', (WidgetTester tester) async {
+    // Regression test for https://github.com/flutter/flutter/issues/84935
+    // SnackBarBehavior.floating set in theme does not assert with margin
+    await tester.pumpWidget(buildApp(
+      themedBehavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(8.0),
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump(); // start animation
+    await tester.pump(const Duration(milliseconds: 750));
+    AssertionError? exception = tester.takeException() as AssertionError?;
+    expect(exception, isNull);
+
+    // SnackBarBehavior.fixed set in theme will still assert with margin
+    await tester.pumpWidget(buildApp(
+      themedBehavior: SnackBarBehavior.fixed,
+      margin: const EdgeInsets.all(8.0),
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump(); // start animation
+    await tester.pump(const Duration(milliseconds: 750));
+    exception = tester.takeException() as AssertionError;
+    expect(
+      exception.message,
+      'Margin can only be used with floating behavior. SnackBarBehavior.fixed '
+          'was set by the inherited SnackBarThemeData.',
+    );
+  });
+
+  testWidgets('SnackBar theme behavior will assert properly for width use', (WidgetTester tester) async {
+    // SnackBarBehavior.floating set in theme does not assert with width
+    await tester.pumpWidget(buildApp(
+      themedBehavior: SnackBarBehavior.floating,
+      width: 5.0,
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump(); // start animation
+    await tester.pump(const Duration(milliseconds: 750));
+    AssertionError? exception = tester.takeException() as AssertionError?;
+    expect(exception, isNull);
+
+    // SnackBarBehavior.fixed set in theme will still assert with width
+    await tester.pumpWidget(buildApp(
+      themedBehavior: SnackBarBehavior.fixed,
+      width: 5.0,
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump(); // start animation
+    await tester.pump(const Duration(milliseconds: 750));
+    exception = tester.takeException() as AssertionError;
+    expect(
+      exception.message,
+      'Width can only be used with floating behavior. SnackBarBehavior.fixed '
+      'was set by the inherited SnackBarThemeData.',
+    );
+  });
 }
 
 SnackBarThemeData _snackBarTheme() {
-  return SnackBarThemeData(
+  return const SnackBarThemeData(
     backgroundColor: Colors.orange,
     actionTextColor: Colors.green,
-    contentTextStyle: const TextStyle(color: Colors.blue),
+    contentTextStyle: TextStyle(color: Colors.blue),
     elevation: 12.0,
-    shape: BeveledRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    shape: BeveledRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
   );
 }
 
 Material _getSnackBarMaterial(WidgetTester tester) {
   return tester.widget<Material>(
-    find.descendant(
-      of: find.byType(SnackBar),
-      matching: find.byType(Material),
-    ).first,
+    _getSnackBarMaterialFinder(tester).first,
+  );
+}
+
+Finder _getSnackBarMaterialFinder(WidgetTester tester) {
+  return find.descendant(
+    of: find.byType(SnackBar),
+    matching: find.byType(Material),
+
   );
 }
 

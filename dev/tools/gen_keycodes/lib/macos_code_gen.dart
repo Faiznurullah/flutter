@@ -25,48 +25,43 @@ const List<String> kModifiersOfInterest = <String>[
 const List<String> kSpecialPhysicalKeys = <String>['CapsLock'];
 const List<String> kSpecialLogicalKeys = <String>['CapsLock'];
 
-String _toConstantVariableName(String variableName) {
-  return 'k${variableName[0].toUpperCase()}${variableName.substring(1)}';
-}
-
 /// Generates the key mapping for macOS, based on the information in the key
 /// data structure given to it.
 class MacOSCodeGenerator extends PlatformCodeGenerator {
-  MacOSCodeGenerator(PhysicalKeyData keyData, LogicalKeyData logicalData)
-    : super(keyData, logicalData);
+  MacOSCodeGenerator(super.keyData, super.logicalData, this._layoutGoals);
 
   /// This generates the map of macOS key codes to physical keys.
   String get _scanCodeMap {
-    final StringBuffer scanCodeMap = StringBuffer();
+    final OutputLines<int> lines = OutputLines<int>('macOS scancode map');
     for (final PhysicalKeyEntry entry in keyData.entries) {
       if (entry.macOSScanCode != null) {
-        scanCodeMap.writeln('  @${toHex(entry.macOSScanCode)} : @${toHex(entry.usbHidCode)},  // ${entry.constantName}');
+        lines.add(entry.macOSScanCode!, '  @${toHex(entry.macOSScanCode)} : @${toHex(entry.usbHidCode)},  // ${entry.constantName}');
       }
     }
-    return scanCodeMap.toString().trimRight();
+    return lines.sortedJoin().trimRight();
   }
 
   String get _keyCodeToLogicalMap {
-    final StringBuffer result = StringBuffer();
+    final OutputLines<int> lines = OutputLines<int>('macOS keycode map');
     for (final LogicalKeyEntry entry in logicalData.entries) {
       zipStrict(entry.macOSKeyCodeValues, entry.macOSKeyCodeNames, (int macOSValue, String macOSName) {
-        result.writeln('  @${toHex(macOSValue)} : @${toHex(entry.value, digits: 11)},  // $macOSName');
+        lines.add(macOSValue,
+            '  @${toHex(macOSValue)} : @${toHex(entry.value, digits: 11)},  // $macOSName -> ${entry.constantName}');
       });
     }
-    return result.toString().trimRight();
+    return lines.sortedJoin().trimRight();
   }
 
   /// This generates the mask values for the part of a key code that defines its plane.
   String get _maskConstants {
     final StringBuffer buffer = StringBuffer();
+    const List<MaskConstant> maskConstants = <MaskConstant>[
+      kValueMask,
+      kUnicodePlane,
+      kMacosPlane,
+    ];
     for (final MaskConstant constant in maskConstants) {
-      buffer.writeln('/**');
-      buffer.write(constant.description
-        .map((String line) => wrapString(line, prefix: ' * '))
-        .join(' *\n'));
-      buffer.writeln(' */');
-      buffer.writeln('const uint64_t ${_toConstantVariableName(constant.name)} = ${toHex(constant.value, digits: 11)};');
-      buffer.writeln('');
+      buffer.writeln('const uint64_t k${constant.upperCamelName} = ${toHex(constant.value, digits: 11)};');
     }
     return buffer.toString().trimRight();
   }
@@ -101,12 +96,30 @@ class MacOSCodeGenerator extends PlatformCodeGenerator {
     return specialKeyConstants.toString().trimRight();
   }
 
+  final Map<String, bool> _layoutGoals;
+  String get _layoutGoalsString {
+    final OutputLines<int> lines = OutputLines<int>('macOS layout goals');
+    _layoutGoals.forEach((String name, bool mandatory) {
+      final PhysicalKeyEntry physicalEntry = keyData.entryByName(name);
+      final LogicalKeyEntry logicalEntry = logicalData.entryByName(name);
+      final String line = 'LayoutGoal{'
+          '${toHex(physicalEntry.macOSScanCode, digits: 2)}, '
+          '${toHex(logicalEntry.value, digits: 2)}, '
+          '${mandatory ? 'true' : 'false'}'
+          '},';
+      lines.add(logicalEntry.value,
+          '    ${line.padRight(39)}'
+          '// ${logicalEntry.name}');
+    });
+    return lines.sortedJoin().trimRight();
+  }
+
   @override
   String get templatePath => path.join(dataRoot, 'macos_key_code_map_cc.tmpl');
 
   @override
   String outputPath(String platform) => path.join(PlatformCodeGenerator.engineRoot,
-      'shell', 'platform', 'darwin', 'macos', 'framework', 'Source', 'KeyCodeMap.mm');
+      'shell', 'platform', 'darwin', 'macos', 'framework', 'Source', 'KeyCodeMap.g.mm');
 
   @override
   Map<String, String> mappings() {
@@ -120,6 +133,7 @@ class MacOSCodeGenerator extends PlatformCodeGenerator {
       'KEYCODE_TO_MODIFIER_FLAG_MAP': _keyToModifierFlagMap,
       'MODIFIER_FLAG_TO_KEYCODE_MAP': _modifierFlagToKeyMap,
       'SPECIAL_KEY_CONSTANTS': _specialKeyConstants,
+      'LAYOUT_GOALS': _layoutGoalsString,
     };
   }
 }

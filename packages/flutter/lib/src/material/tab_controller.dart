@@ -32,7 +32,7 @@ import 'constants.dart';
 ///
 /// ```dart
 /// class MyTabbedPage extends StatefulWidget {
-///   const MyTabbedPage({ Key? key }) : super(key: key);
+///   const MyTabbedPage({ super.key });
 ///   @override
 ///   State<MyTabbedPage> createState() => _MyTabbedPageState();
 /// }
@@ -84,56 +84,11 @@ import 'constants.dart';
 /// ```
 /// {@end-tool}
 ///
-/// {@tool dartpad --template=stateless_widget_material}
-///
+/// {@tool dartpad}
 /// This example shows how to listen to page updates in [TabBar] and [TabBarView]
 /// when using [DefaultTabController].
 ///
-/// ```dart preamble
-/// const List<Tab> tabs = <Tab>[
-///   Tab(text: 'Zeroth'),
-///   Tab(text: 'First'),
-///   Tab(text: 'Second'),
-/// ];
-/// ```
-///
-/// ```dart
-/// Widget build(BuildContext context) {
-///   return DefaultTabController(
-///     length: tabs.length,
-///     // The Builder widget is used to have a different BuildContext to access
-///     // closest DefaultTabController.
-///     child: Builder(
-///       builder: (BuildContext context) {
-///         final TabController tabController = DefaultTabController.of(context)!;
-///         tabController.addListener(() {
-///           if (!tabController.indexIsChanging) {
-///             // Your code goes here.
-///             // To get index of current tab use tabController.index
-///           }
-///         });
-///         return Scaffold(
-///           appBar: AppBar(
-///             bottom: const TabBar(
-///               tabs: tabs,
-///             ),
-///           ),
-///           body: TabBarView(
-///             children: tabs.map((Tab tab){
-///               return Center(
-///                 child: Text(
-///                   tab.text! + ' Tab',
-///                   style: Theme.of(context).textTheme.headline5,
-///                 ),
-///               );
-///             }).toList(),
-///           ),
-///         );
-///       }
-///     ),
-///   );
-/// }
-/// ```
+/// ** See code in examples/api/lib/material/tab_controller/tab_controller.1.dart **
 /// {@end-tool}
 ///
 class TabController extends ChangeNotifier {
@@ -146,11 +101,12 @@ class TabController extends ChangeNotifier {
   ///
   /// The `initialIndex` must be valid given [length] and must not be null. If
   /// [length] is zero, then `initialIndex` must be 0 (the default).
-  TabController({ int initialIndex = 0, required this.length, required TickerProvider vsync })
+  TabController({ int initialIndex = 0, Duration? animationDuration, required this.length, required TickerProvider vsync})
     : assert(length != null && length >= 0),
       assert(initialIndex != null && initialIndex >= 0 && (length == 0 || initialIndex < length)),
       _index = initialIndex,
       _previousIndex = initialIndex,
+      _animationDuration = animationDuration ?? kTabScrollDuration,
       _animationController = AnimationController.unbounded(
         value: initialIndex.toDouble(),
         vsync: vsync,
@@ -162,14 +118,16 @@ class TabController extends ChangeNotifier {
     required int index,
     required int previousIndex,
     required AnimationController? animationController,
+    required Duration animationDuration,
     required this.length,
   }) : _index = index,
        _previousIndex = previousIndex,
-       _animationController = animationController;
+       _animationController = animationController,
+       _animationDuration = animationDuration;
 
 
-  /// Creates a new [TabController] with `index`, `previousIndex`, and `length`
-  /// if they are non-null.
+  /// Creates a new [TabController] with `index`, `previousIndex`, `length`, and
+  /// `animationDuration` if they are non-null.
   ///
   /// This method is used by [DefaultTabController].
   ///
@@ -179,6 +137,7 @@ class TabController extends ChangeNotifier {
     required int? index,
     required int? length,
     required int? previousIndex,
+    required Duration? animationDuration,
   }) {
     if (index != null) {
       _animationController!.value = index.toDouble();
@@ -188,6 +147,7 @@ class TabController extends ChangeNotifier {
       length: length ?? this.length,
       animationController: _animationController,
       previousIndex: previousIndex ?? _previousIndex,
+      animationDuration: animationDuration ?? _animationDuration,
     );
   }
 
@@ -204,6 +164,12 @@ class TabController extends ChangeNotifier {
   Animation<double>? get animation => _animationController?.view;
   AnimationController? _animationController;
 
+  /// Controls the duration of TabController and TabBarView animations.
+  ///
+  /// Defaults to kTabScrollDuration.
+  Duration get animationDuration => _animationDuration;
+  final Duration _animationDuration;
+
   /// The total number of tabs.
   ///
   /// Typically greater than one. Must match [TabBar.tabs]'s and
@@ -215,11 +181,12 @@ class TabController extends ChangeNotifier {
     assert(value >= 0 && (value < length || length == 0));
     assert(duration != null || curve == null);
     assert(_indexIsChangingCount >= 0);
-    if (value == _index || length < 2)
+    if (value == _index || length < 2) {
       return;
+    }
     _previousIndex = index;
     _index = value;
-    if (duration != null) {
+    if (duration != null && duration > Duration.zero) {
       _indexIsChangingCount += 1;
       notifyListeners(); // Because the value of indexIsChanging may have changed.
       _animationController!
@@ -273,8 +240,8 @@ class TabController extends ChangeNotifier {
   ///
   /// While the animation is running [indexIsChanging] is true. When the
   /// animation completes [offset] will be 0.0.
-  void animateTo(int value, { Duration duration = kTabScrollDuration, Curve curve = Curves.ease }) {
-    _changeIndex(value, duration: duration, curve: curve);
+  void animateTo(int value, { Duration? duration, Curve curve = Curves.ease }) {
+    _changeIndex(value, duration: duration ?? _animationDuration, curve: curve);
   }
 
   /// The difference between the [animation]'s value and [index].
@@ -290,8 +257,9 @@ class TabController extends ChangeNotifier {
     assert(value != null);
     assert(value >= -1.0 && value <= 1.0);
     assert(!indexIsChanging);
-    if (value == offset)
+    if (value == offset) {
       return;
+    }
     _animationController!.value = value + _index.toDouble();
   }
 
@@ -305,11 +273,10 @@ class TabController extends ChangeNotifier {
 
 class _TabControllerScope extends InheritedWidget {
   const _TabControllerScope({
-    Key? key,
     required this.controller,
     required this.enabled,
-    required Widget child,
-  }) : super(key: key, child: child);
+    required super.child,
+  });
 
   final TabController controller;
   final bool enabled;
@@ -335,7 +302,9 @@ class _TabControllerScope extends InheritedWidget {
 ///
 /// ```dart
 /// class MyDemo extends StatelessWidget {
-///   final List<Tab> myTabs = <Tab>[
+///   const MyDemo({super.key});
+///
+///   static const List<Tab> myTabs = <Tab>[
 ///     Tab(text: 'LEFT'),
 ///     Tab(text: 'RIGHT'),
 ///   ];
@@ -346,13 +315,13 @@ class _TabControllerScope extends InheritedWidget {
 ///       length: myTabs.length,
 ///       child: Scaffold(
 ///         appBar: AppBar(
-///           bottom: TabBar(
+///           bottom: const TabBar(
 ///             tabs: myTabs,
 ///           ),
 ///         ),
 ///         body: TabBarView(
 ///           children: myTabs.map((Tab tab) {
-///             final String label = tab.text.toLowerCase();
+///             final String label = tab.text!.toLowerCase();
 ///             return Center(
 ///               child: Text(
 ///                 'This is the $label tab',
@@ -374,14 +343,14 @@ class DefaultTabController extends StatefulWidget {
   ///
   /// The [initialIndex] argument must not be null.
   const DefaultTabController({
-    Key? key,
+    super.key,
     required this.length,
     this.initialIndex = 0,
     required this.child,
+    this.animationDuration,
   }) : assert(initialIndex != null),
        assert(length >= 0),
-       assert(length == 0 || (initialIndex >= 0 && initialIndex < length)),
-       super(key: key);
+       assert(length == 0 || (initialIndex >= 0 && initialIndex < length));
 
   /// The total number of tabs.
   ///
@@ -393,6 +362,11 @@ class DefaultTabController extends StatefulWidget {
   ///
   /// Defaults to zero.
   final int initialIndex;
+
+  /// Controls the duration of DefaultTabController and TabBarView animations.
+  ///
+  /// Defaults to kTabScrollDuration.
+  final Duration? animationDuration;
 
   /// The widget below this widget in the tree.
   ///
@@ -429,6 +403,7 @@ class _DefaultTabControllerState extends State<DefaultTabController> with Single
       vsync: this,
       length: widget.length,
       initialIndex: widget.initialIndex,
+      animationDuration: widget.animationDuration,
     );
   }
 
@@ -461,8 +436,18 @@ class _DefaultTabControllerState extends State<DefaultTabController> with Single
       }
       _controller = _controller._copyWith(
         length: widget.length,
+        animationDuration: widget.animationDuration,
         index: newIndex,
         previousIndex: previousIndex,
+      );
+    }
+
+    if (oldWidget.animationDuration != widget.animationDuration) {
+      _controller = _controller._copyWith(
+        length: widget.length,
+        animationDuration: widget.animationDuration,
+        index: _controller.index,
+        previousIndex: _controller.previousIndex,
       );
     }
   }

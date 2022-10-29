@@ -82,7 +82,7 @@ class VsCode {
   Version? _extensionVersion;
   final List<ValidationMessage> _validationMessages = <ValidationMessage>[];
 
-  String get productName => 'VS Code' + (edition != null ? ', $edition' : '');
+  String get productName => 'VS Code${edition != null ? ', $edition' : ''}';
 
   Iterable<ValidationMessage> get validationMessages => _validationMessages;
 
@@ -293,7 +293,7 @@ class VsCode {
     final String jsonString = fileSystem.file(packageJsonPath).readAsStringSync();
     try {
       final Map<String, dynamic>? jsonObject = castStringKeyedMap(json.decode(jsonString));
-      if (jsonObject?.containsKey('version') == true) {
+      if (jsonObject?.containsKey('version') ?? false) {
         return jsonObject!['version'] as String;
       }
     } on FormatException {
@@ -326,5 +326,5 @@ class VsCodeInstallLocation {
 
   @override
   // Lowest bit is for isInsiders boolean.
-  int get hashCode => installPath.hashCode ^ extensionsFolder.hashCode ^ edition.hashCode;
+  int get hashCode => Object.hash(installPath, extensionsFolder, edition);
 }

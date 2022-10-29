@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:path/path.dart' as path;
-import '_goldens_io.dart' if (dart.library.html) '_goldens_web.dart' as _goldens;
+import 'package:test_api/test_api.dart'; // ignore: deprecated_member_use
+
+import '_goldens_io.dart' if (dart.library.html) '_goldens_web.dart' as goldens;
 
 /// Compares image pixels against a golden image file.
 ///
@@ -37,6 +40,8 @@ import '_goldens_io.dart' if (dart.library.html) '_goldens_web.dart' as _goldens
 /// |  Golden Master Image           | ![A golden master image](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_masterImage.png)  |
 /// |  Difference                    | ![The pixel difference](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_isolatedDiff.png)  |
 /// |  Test image after modification | ![Test image](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_testImage.png) |
+///
+/// {@macro flutter.flutter_test.matchesGoldenFile.custom_fonts}
 ///
 /// See also:
 ///
@@ -81,21 +86,18 @@ abstract class GoldenFileComparator {
   /// Version numbers are used in golden file tests for package:flutter. You can
   /// learn more about these tests [here](https://github.com/flutter/flutter/wiki/Writing-a-golden-file-test-for-package:flutter).
   Uri getTestUri(Uri key, int? version) {
-    if (version == null)
+    if (version == null) {
       return key;
+    }
     final String keyString = key.toString();
     final String extension = path.extension(keyString);
-    return Uri.parse(
-      keyString
-        .split(extension)
-        .join() + '.' + version.toString() + extension
-    );
+    return Uri.parse('${keyString.split(extension).join()}.$version$extension');
   }
 
   /// Returns a [ComparisonResult] to describe the pixel differential of the
   /// [test] and [master] image bytes provided.
   static Future<ComparisonResult> compareLists(List<int> test, List<int> master) {
-    return _goldens.compareLists(test, master);
+    return goldens.compareLists(test, master);
   }
 }
 
@@ -143,7 +145,7 @@ set goldenFileComparator(GoldenFileComparator value) {
 /// fake async constraints that are normally imposed on widget tests (i.e. the
 /// need or the ability to call [WidgetTester.pump] to advance the microtask
 /// queue). Prior to the invocation, the test framework will render only the
-/// [Element] to be compared on the screen.
+/// [widgets.Element] to be compared on the screen.
 ///
 /// See also:
 ///
@@ -192,15 +194,12 @@ abstract class WebGoldenComparator {
   /// Version numbers are used in golden file tests for package:flutter. You can
   /// learn more about these tests [here](https://github.com/flutter/flutter/wiki/Writing-a-golden-file-test-for-package:flutter).
   Uri getTestUri(Uri key, int? version) {
-    if (version == null)
+    if (version == null) {
       return key;
+    }
     final String keyString = key.toString();
     final String extension = path.extension(keyString);
-    return Uri.parse(
-      keyString
-        .split(extension)
-        .join() + '.' + version.toString() + extension
-    );
+    return Uri.parse('${keyString.split(extension).join()}.$version$extension');
   }
 }
 
@@ -212,7 +211,7 @@ abstract class WebGoldenComparator {
 /// When using `flutter test --platform=chrome`, a comparator implemented by
 /// [DefaultWebGoldenComparator] is used if no other comparator is specified. It
 /// will send a request to the test server, which uses [goldenFileComparator]
-/// for golden file compatison.
+/// for golden file comparison.
 ///
 /// When using `flutter test --update-goldens`, the [DefaultWebGoldenComparator]
 /// updates the files on disk to match the rendering.
@@ -275,6 +274,10 @@ class TrivialComparator implements GoldenFileComparator {
 
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) {
+    // Ideally we would use markTestSkipped here but in some situations,
+    // comparators are called outside of tests.
+    // See also: https://github.com/flutter/flutter/issues/91285
+    // ignore: avoid_print
     print('Golden file comparison requested for "$golden"; skipping...');
     return Future<bool>.value(true);
   }
@@ -295,6 +298,10 @@ class _TrivialWebGoldenComparator implements WebGoldenComparator {
 
   @override
   Future<bool> compare(double width, double height, Uri golden) {
+    // Ideally we would use markTestSkipped here but in some situations,
+    // comparators are called outside of tests.
+    // See also: https://github.com/flutter/flutter/issues/91285
+    // ignore: avoid_print
     print('Golden comparison requested for "$golden"; skipping...');
     return Future<bool>.value(true);
   }
@@ -334,8 +341,7 @@ class ComparisonResult {
 
   /// Map containing differential images to illustrate found variants in pixel
   /// values in the execution of the pixel test.
-  // TODO(jonahwilliams): fix type signature when image is updated to support web.
-  final Map<String, Object>? diffs;
+  final Map<String, Image>? diffs;
 
   /// The calculated percentage of pixel difference between two images.
   final double diffPercent;

@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// reduced-test-set:
+//   This file is run as part of a reduced test set in CI on Mac and Windows
+//   machines.
+@Tags(<String>['reduced-test-set'])
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,6 +87,10 @@ void main() {
     await tester.pumpWidget(const ClipRect(clipBehavior: Clip.antiAlias));
 
     expect(renderClip.clipBehavior, equals(Clip.antiAlias));
+
+    await tester.pumpWidget(const ClipRect(clipBehavior: Clip.none));
+
+    expect(renderClip.clipBehavior, equals(Clip.none));
   });
 
   test('ClipRRect constructs with the right default values', () {
@@ -100,6 +109,10 @@ void main() {
     await tester.pumpWidget(const ClipRRect(clipBehavior: Clip.hardEdge));
 
     expect(renderClip.clipBehavior, equals(Clip.hardEdge));
+
+    await tester.pumpWidget(const ClipRRect(clipBehavior: Clip.none));
+
+    expect(renderClip.clipBehavior, equals(Clip.none));
   });
 
   testWidgets('ClipOval updates clipBehavior in updateRenderObject', (WidgetTester tester) async {
@@ -112,6 +125,10 @@ void main() {
     await tester.pumpWidget(const ClipOval(clipBehavior: Clip.hardEdge));
 
     expect(renderClip.clipBehavior, equals(Clip.hardEdge));
+
+    await tester.pumpWidget(const ClipOval(clipBehavior: Clip.none));
+
+    expect(renderClip.clipBehavior, equals(Clip.none));
   });
 
   testWidgets('ClipPath updates clipBehavior in updateRenderObject', (WidgetTester tester) async {
@@ -124,6 +141,10 @@ void main() {
     await tester.pumpWidget(const ClipPath(clipBehavior: Clip.hardEdge));
 
     expect(renderClip.clipBehavior, equals(Clip.hardEdge));
+
+    await tester.pumpWidget(const ClipPath(clipBehavior: Clip.none));
+
+    expect(renderClip.clipBehavior, equals(Clip.none));
   });
 
   testWidgets('ClipPath', (WidgetTester tester) async {
@@ -310,6 +331,7 @@ void main() {
 
     await tester.tapAt(const Offset(100.0, 100.0));
     expect(log, equals(<String>['a', 'tap', 'a', 'b', 'c', 'tap']));
+    log.clear();
   });
 
   testWidgets('debugPaintSizeEnabled', (WidgetTester tester) async {
@@ -389,7 +411,6 @@ void main() {
               width: 100.0,
               height: 100.0,
               child: ClipRect(
-                clipBehavior: Clip.hardEdge,
                 child: Container(
                   color: Colors.blue,
                 ),
@@ -523,9 +544,9 @@ void main() {
                 child: Transform.rotate(
                   angle: 1.0, // radians
                   child: ClipPath(
-                    clipper: ShapeBorderClipper(
+                    clipper: const ShapeBorderClipper(
                       shape: BeveledRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.0),
+                        borderRadius: BorderRadius.all(Radius.circular(20.0)),
                       ),
                     ),
                     child: Container(
@@ -570,7 +591,7 @@ void main() {
               child: Transform.rotate(
                 angle: 1.0, // radians
                 child: PhysicalModel(
-                  borderRadius: BorderRadius.circular(20.0),
+                  borderRadius: const BorderRadius.all(Radius.circular(20.0)),
                   color: Colors.red,
                   clipBehavior: clipBehavior,
                   child: Container(
@@ -634,7 +655,7 @@ void main() {
                 child: Transform.rotate(
                   angle: 1.0, // radians
                   child: PhysicalModel(
-                    borderRadius: BorderRadius.circular(20.0),
+                    borderRadius: const BorderRadius.all(Radius.circular(20.0)),
                     color: Colors.red,
                     child: Container(
                       color: Colors.white,
@@ -675,9 +696,9 @@ void main() {
               child: Transform.rotate(
                 angle: 1.0, // radians
                 child: PhysicalShape(
-                  clipper: ShapeBorderClipper(
+                  clipper: const ShapeBorderClipper(
                     shape: BeveledRectangleBorder(
-                      borderRadius: BorderRadius.circular(20.0),
+                      borderRadius: BorderRadius.all(Radius.circular(20.0)),
                     ),
                   ),
                   clipBehavior: clipBehavior,
@@ -741,9 +762,9 @@ void main() {
                 child: Transform.rotate(
                   angle: 1.0, // radians
                   child: PhysicalShape(
-                    clipper: ShapeBorderClipper(
+                    clipper: const ShapeBorderClipper(
                       shape: BeveledRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.0),
+                        borderRadius: BorderRadius.all(Radius.circular(20.0)),
                       ),
                     ),
                     color: Colors.red,
@@ -861,5 +882,91 @@ void main() {
       ..restore()
       ..restore(),
     );
+  });
+
+  testWidgets('ClipRRect supports BorderRadiusDirectional', (WidgetTester tester) async {
+    const Radius startRadius = Radius.circular(15.0);
+    const Radius endRadius = Radius.circular(30.0);
+
+    Widget buildClipRRect(TextDirection textDirection) {
+      return Directionality(
+        textDirection: textDirection,
+        child: const ClipRRect(
+          borderRadius: BorderRadiusDirectional.horizontal(
+            start: startRadius,
+            end: endRadius,
+          ),
+        ),
+      );
+    }
+
+    for (final TextDirection textDirection in TextDirection.values) {
+      await tester.pumpWidget(buildClipRRect(textDirection));
+      final RenderClipRRect renderClip = tester.allRenderObjects.whereType<RenderClipRRect>().first;
+      final bool isRtl = textDirection == TextDirection.rtl;
+      expect(renderClip.borderRadius.resolve(textDirection).topLeft, isRtl ? endRadius : startRadius);
+      expect(renderClip.borderRadius.resolve(textDirection).topRight, isRtl ? startRadius : endRadius);
+      expect(renderClip.borderRadius.resolve(textDirection).bottomLeft, isRtl ? endRadius : startRadius);
+      expect(renderClip.borderRadius.resolve(textDirection).bottomRight, isRtl ? startRadius : endRadius);
+    }
+  });
+
+  testWidgets('ClipRRect is direction-aware', (WidgetTester tester) async {
+    const Radius startRadius = Radius.circular(15.0);
+    const Radius endRadius = Radius.circular(30.0);
+    TextDirection textDirection = TextDirection.ltr;
+
+    Widget buildClipRRect(TextDirection textDirection) {
+      return Directionality(
+        textDirection: textDirection,
+        child: const ClipRRect(
+          borderRadius: BorderRadiusDirectional.horizontal(
+            start: startRadius,
+            end: endRadius,
+          ),
+        ),
+      );
+    }
+
+    Widget buildStatefulClipRRect() {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return Directionality(
+            textDirection: textDirection,
+            child: SizedBox(
+              width: 100.0,
+              height: 100.0,
+              child: ClipRRect(
+                borderRadius: const BorderRadiusDirectional.horizontal(
+                  start: startRadius,
+                  end: endRadius,
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      textDirection = TextDirection.rtl;
+                    });
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    for (final TextDirection textDirection in TextDirection.values) {
+      await tester.pumpWidget(buildClipRRect(textDirection));
+      final RenderClipRRect renderClip = tester.allRenderObjects.whereType<RenderClipRRect>().first;
+      final bool isRtl = textDirection == TextDirection.rtl;
+      expect(renderClip.textDirection, isRtl ? TextDirection.rtl : TextDirection.ltr);
+    }
+
+    await tester.pumpWidget(buildStatefulClipRRect());
+    final RenderClipRRect renderClip = tester.allRenderObjects.whereType<RenderClipRRect>().first;
+    expect(renderClip.textDirection, TextDirection.ltr);
+    await tester.tapAt(Offset.zero);
+    await tester.pump();
+    expect(renderClip.textDirection, TextDirection.rtl);
   });
 }

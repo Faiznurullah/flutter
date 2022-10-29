@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart' show collectAllElementsFrom;
 
 import '../common.dart';
@@ -42,6 +43,12 @@ Future<void> main() async {
     ),
   ));
 
+  // Lists may not be scrolled into frame in landscape.
+  SystemChrome.setPreferredOrientations(<DeviceOrientation>[
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   // Wait for frame rendering to stabilize.
   for (int i = 0; i < 5; i++) {
     await SchedulerBinding.instance.endOfFrame;
@@ -51,17 +58,17 @@ Future<void> main() async {
 
   print('flutter_test allElements benchmark... (${WidgetsBinding.instance.renderViewElement})');
   // Make sure we get enough elements to process for consistent benchmark runs
-  int elementCount = collectAllElementsFrom(WidgetsBinding.instance.renderViewElement, skipOffstage: false).length;
+  int elementCount = collectAllElementsFrom(WidgetsBinding.instance.renderViewElement!, skipOffstage: false).length;
   while (elementCount < 2458) {
     await Future<void>.delayed(Duration.zero);
-    elementCount = collectAllElementsFrom(WidgetsBinding.instance.renderViewElement, skipOffstage: false).length;
+    elementCount = collectAllElementsFrom(WidgetsBinding.instance.renderViewElement!, skipOffstage: false).length;
   }
   print('element count: $elementCount');
 
   watch.start();
   for (int i = 0; i < _kNumIters; i += 1) {
     final List<Element> allElements = collectAllElementsFrom(
-      WidgetsBinding.instance.renderViewElement,
+      WidgetsBinding.instance.renderViewElement!,
       skipOffstage: false,
     ).toList();
     allElements.clear();

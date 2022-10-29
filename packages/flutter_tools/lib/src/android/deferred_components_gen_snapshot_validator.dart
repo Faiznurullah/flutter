@@ -84,7 +84,7 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
     XmlDocument document;
     try {
       document = XmlDocument.parse(appManifestFile.readAsStringSync());
-    } on XmlParserException {
+    } on XmlException {
       invalidFiles[appManifestFile.path] = 'Error parsing $appManifestFile '
         'Please ensure that the android manifest is a valid XML document and '
         'try again.';
@@ -183,7 +183,7 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
   /// considered new.
   bool checkAgainstLoadingUnitsCache(
       List<LoadingUnit> generatedLoadingUnits) {
-    final List<LoadingUnit> cachedLoadingUnits = _parseLodingUnitsCache(projectDir.childFile(DeferredComponentsValidator.kLoadingUnitsCacheFileName));
+    final List<LoadingUnit> cachedLoadingUnits = _parseLoadingUnitsCache(projectDir.childFile(DeferredComponentsValidator.kLoadingUnitsCacheFileName));
     loadingUnitComparisonResults = <String, Object>{};
     final Set<LoadingUnit> unmatchedLoadingUnits = <LoadingUnit>{};
     final List<LoadingUnit> newLoadingUnits = <LoadingUnit>[];
@@ -215,7 +215,7 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
     return loadingUnitComparisonResults!['match']! as bool;
   }
 
-  List<LoadingUnit> _parseLodingUnitsCache(File cacheFile) {
+  List<LoadingUnit> _parseLoadingUnitsCache(File cacheFile) {
     final List<LoadingUnit> loadingUnits = <LoadingUnit>[];
     inputs.add(cacheFile);
     if (!cacheFile.existsSync()) {
@@ -234,7 +234,7 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
         return loadingUnits;
       }
       if (data['loading-units'] != null) {
-        for (final Object? loadingUnitData in data['loading-units']) {
+        for (final Object? loadingUnitData in data['loading-units'] as List<Object?>) {
           if (loadingUnitData is! YamlMap) {
             invalidFiles[cacheFile.path] = "Invalid loading units yaml file, 'loading-units' "
                                              'is not a list of maps.';
@@ -267,7 +267,7 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
     // Parse out validated yaml.
     if (data.containsKey('loading-units')) {
       if (data['loading-units'] != null) {
-        for (final Object? loadingUnitData in data['loading-units']) {
+        for (final Object? loadingUnitData in data['loading-units'] as List<Object?>) {
           final YamlMap? loadingUnitDataMap = loadingUnitData as YamlMap?;
           final List<String> libraries = <String>[];
           final YamlList? nodes = loadingUnitDataMap?['libraries'] as YamlList?;
@@ -279,7 +279,6 @@ class DeferredComponentsGenSnapshotValidator extends DeferredComponentsValidator
           loadingUnits.add(
               LoadingUnit(
                 id: loadingUnitDataMap!['id'] as int,
-                path: null,
                 libraries: libraries,
               ));
         }

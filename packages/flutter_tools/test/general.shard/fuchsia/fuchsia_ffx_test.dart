@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:file/file.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
@@ -16,10 +14,10 @@ import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
 
 void main() {
-  FakeFuchsiaArtifacts fakeFuchsiaArtifacts;
-  BufferLogger logger;
-  MemoryFileSystem memoryFileSystem;
-  File ffx;
+  late FakeFuchsiaArtifacts fakeFuchsiaArtifacts;
+  late BufferLogger logger;
+  late MemoryFileSystem memoryFileSystem;
+  late File ffx;
 
   setUp(() {
     fakeFuchsiaArtifacts = FakeFuchsiaArtifacts();
@@ -47,8 +45,7 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 's'],
-          exitCode: 0,
+          command: <String>[ffx.path, 'target', 'list', '-f', 's'],
           stderr: 'No devices found.',
         ),
       ]);
@@ -69,7 +66,7 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 's'],
+          command: <String>[ffx.path, 'target', 'list', '-f', 's'],
           exitCode: 1,
           stderr: 'unexpected error',
         ),
@@ -91,8 +88,7 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 's'],
-          exitCode: 0,
+          command: <String>[ffx.path, 'target', 'list', '-f', 's'],
           stdout: 'device1\ndevice2',
         ),
       ]);
@@ -113,8 +109,7 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, '-T', '2', 'target', 'list', '--format', 's'],
-          exitCode: 0,
+          command: <String>[ffx.path, '-T', '2', 'target', 'list', '-f', 's'],
           stdout: 'device1',
         ),
       ]);
@@ -148,7 +143,14 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 'a', 'unknown-device'],
+          command: <String>[
+            ffx.path,
+            'target',
+            'list',
+            '-f',
+            'a',
+            'unknown-device'
+          ],
           exitCode: 2,
           stderr: 'No devices found.',
         ),
@@ -170,7 +172,14 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 'a', 'error-device'],
+          command: <String>[
+            ffx.path,
+            'target',
+            'list',
+            '-f',
+            'a',
+            'error-device'
+          ],
           exitCode: 1,
           stderr: 'unexpected error',
         ),
@@ -192,8 +201,14 @@ void main() {
       final ProcessManager processManager =
           FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
-          command: <String>[ffx.path, 'target', 'list', '--format', 'a', 'known-device'],
-          exitCode: 0,
+          command: <String>[
+            ffx.path,
+            'target',
+            'list',
+            '-f',
+            'a',
+            'known-device'
+          ],
           stdout: '1234-1234-1234-1234',
         ),
       ]);
@@ -212,5 +227,5 @@ void main() {
 
 class FakeFuchsiaArtifacts extends Fake implements FuchsiaArtifacts {
   @override
-  File ffx;
+  File? ffx;
 }

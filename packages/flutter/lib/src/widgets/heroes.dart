@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 import 'package:flutter/foundation.dart';
-
 import 'basic.dart';
 import 'binding.dart';
 import 'framework.dart';
+import 'implicit_animations.dart';
+import 'media_query.dart';
 import 'navigator.dart';
 import 'overlay.dart';
 import 'pages.dart';
@@ -71,7 +72,6 @@ enum HeroFlightDirection {
   pop,
 }
 
-
 /// A widget that marks its child as being a candidate for
 /// [hero animations](https://flutter.dev/docs/development/ui/animations/hero-animations).
 ///
@@ -101,7 +101,7 @@ enum HeroFlightDirection {
 ///
 /// {@youtube 560 315 https://www.youtube.com/watch?v=Be9UH1kXFDw}
 ///
-/// {@tool dartpad --template=stateless_widget_material}
+/// {@tool dartpad}
 /// This sample shows a [Hero] used within a [ListTile].
 ///
 /// Tapping on the Hero-wrapped rectangle triggers a hero
@@ -113,56 +113,14 @@ enum HeroFlightDirection {
 /// The Hero widget uses the matching tags to identify and execute this
 /// animation.
 ///
-/// ```dart
-///  Widget build(BuildContext context) {
-///    return Column(
-///      crossAxisAlignment: CrossAxisAlignment.start,
-///      children: <Widget>[
-///        const SizedBox(
-///          height: 20.0,
-///        ),
-///        ListTile(
-///          leading: Hero(
-///            tag: 'hero-rectangle',
-///            child: _blueRectangle(const Size(50, 50)),
-///          ),
-///          onTap: () => _gotoDetailsPage(context),
-///          title: const Text('Tap on the icon to view hero animation transition.'),
-///        ),
-///      ],
-///    );
-///  }
+/// ** See code in examples/api/lib/widgets/heroes/hero.0.dart **
+/// {@end-tool}
 ///
-///  Widget _blueRectangle(Size size) {
-///   return Container(
-///     width: size.width,
-///     height: size.height,
-///     color: Colors.blue,
-///    );
-///  }
+/// {@tool dartpad}
+/// This sample shows [Hero] flight animations using default tween
+/// and custom rect tween.
 ///
-///  void _gotoDetailsPage(BuildContext context) {
-///    Navigator.of(context).push(MaterialPageRoute<void>(
-///      builder: (BuildContext context) => Scaffold(
-///        appBar: AppBar(
-///          title: const Text('second Page'),
-///        ),
-///        body: Center(
-///          child: Column(
-///            mainAxisAlignment: MainAxisAlignment.center,
-///            children: <Widget>[
-///              Hero(
-///                tag: 'hero-rectangle',
-///                child: _blueRectangle(const Size(200, 200)),
-///              ),
-///            ],
-///          ),
-///        ),
-///      ),
-///    ));
-///  }
-///
-/// ```
+/// ** See code in examples/api/lib/widgets/heroes/hero.1.dart **
 /// {@end-tool}
 ///
 /// ## Discussion
@@ -178,9 +136,15 @@ enum HeroFlightDirection {
 /// To make the animations look good, it's critical that the widget tree for the
 /// hero in both locations be essentially identical. The widget of the *target*
 /// is, by default, used to do the transition: when going from route A to route
-/// B, route B's hero's widget is placed over route A's hero's widget. If a
-/// [flightShuttleBuilder] is supplied, its output widget is shown during the
-/// flight transition instead.
+/// B, route B's hero's widget is placed over route A's hero's widget. Additionally,
+/// if the [Hero] subtree changes appearance based on an [InheritedWidget] (such
+/// as [MediaQuery] or [Theme]), then the hero animation may have discontinuity
+/// at the start or the end of the animation because route A and route B provides
+/// different such [InheritedWidget]s. Consider providing a custom [flightShuttleBuilder]
+/// to ensure smooth transitions. The default [flightShuttleBuilder] interpolates
+/// [MediaQuery]'s paddings. If your [Hero] widget uses custom [InheritedWidget]s
+/// and displays a discontinuity in the animation, try to provide custom in-flight
+/// transition using [flightShuttleBuilder].
 ///
 /// By default, both route A and route B's heroes are hidden while the
 /// transitioning widget is animating in-flight above the 2 routes.
@@ -209,7 +173,7 @@ class Hero extends StatefulWidget {
   /// The [tag] and [child] parameters must not be null.
   /// The [child] parameter and all of the its descendants must not be [Hero]es.
   const Hero({
-    Key? key,
+    super.key,
     required this.tag,
     this.createRectTween,
     this.flightShuttleBuilder,
@@ -218,8 +182,7 @@ class Hero extends StatefulWidget {
     required this.child,
   }) : assert(tag != null),
        assert(transitionOnUserGestures != null),
-       assert(child != null),
-       super(key: key);
+       assert(child != null);
 
   /// The identifier for this particular hero. If the tag of this hero matches
   /// the tag of a hero on a [PageRoute] that we're navigating to or from, then
@@ -422,12 +385,13 @@ class _HeroState extends State<Hero> {
   // This method can be safely called even when this [Hero] is currently not in
   // a flight.
   void endFlight({ bool keepPlaceholder = false }) {
-    if (keepPlaceholder || _placeholderSize == null)
+    if (keepPlaceholder || _placeholderSize == null) {
       return;
+    }
 
     _placeholderSize = null;
     if (mounted) {
-      // Tell the widget to rebuild if it's mounted. _paceholderSize has already
+      // Tell the widget to rebuild if it's mounted. _placeholderSize has already
       // been updated.
       setState(() {});
     }
@@ -595,11 +559,9 @@ class _HeroFlight {
           bottom: offsets.bottom,
           left: offsets.left,
           child: IgnorePointer(
-            child: RepaintBoundary(
-              child: Opacity(
-                opacity: _heroOpacity.value,
-                child: child,
-              ),
+            child: FadeTransition(
+              opacity: _heroOpacity,
+              child: child,
             ),
           ),
         );
@@ -626,7 +588,7 @@ class _HeroFlight {
     }
   }
 
-  bool _scheduledPerformAnimtationUpdate = false;
+  bool _scheduledPerformAnimationUpdate = false;
   void _handleAnimationUpdate(AnimationStatus status) {
     // The animation will not finish until the user lifts their finger, so we
     // should suppress the status update if the gesture is in progress, and
@@ -636,23 +598,24 @@ class _HeroFlight {
       return;
     }
 
-    if (_scheduledPerformAnimtationUpdate)
+    if (_scheduledPerformAnimationUpdate) {
       return;
+    }
 
     // The `navigator` must be non-null here, or the first if clause above would
     // have returned from this method.
     final NavigatorState navigator = manifest.fromRoute.navigator!;
 
-    void delayedPerformAnimtationUpdate() {
+    void delayedPerformAnimationUpdate() {
       assert(!navigator.userGestureInProgress);
-      assert(_scheduledPerformAnimtationUpdate);
-      _scheduledPerformAnimtationUpdate = false;
-      navigator.userGestureInProgressNotifier.removeListener(delayedPerformAnimtationUpdate);
+      assert(_scheduledPerformAnimationUpdate);
+      _scheduledPerformAnimationUpdate = false;
+      navigator.userGestureInProgressNotifier.removeListener(delayedPerformAnimationUpdate);
       _performAnimationUpdate(_proxyAnimation.status);
     }
     assert(navigator.userGestureInProgress);
-    _scheduledPerformAnimtationUpdate = true;
-    navigator.userGestureInProgressNotifier.addListener(delayedPerformAnimtationUpdate);
+    _scheduledPerformAnimationUpdate = true;
+    navigator.userGestureInProgressNotifier.addListener(delayedPerformAnimationUpdate);
   }
 
   void onTick() {
@@ -705,20 +668,20 @@ class _HeroFlight {
 
     manifest = initialManifest;
 
-    final bool shouldIncludeChildInPlacehold;
+    final bool shouldIncludeChildInPlaceholder;
     switch (manifest.type) {
       case HeroFlightDirection.pop:
         _proxyAnimation.parent = ReverseAnimation(manifest.animation);
-        shouldIncludeChildInPlacehold = false;
+        shouldIncludeChildInPlaceholder = false;
         break;
       case HeroFlightDirection.push:
         _proxyAnimation.parent = manifest.animation;
-        shouldIncludeChildInPlacehold = true;
+        shouldIncludeChildInPlaceholder = true;
         break;
     }
 
     heroRectTween = manifest.createHeroRectTween(begin: manifest.fromHeroLocation, end: manifest.toHeroLocation);
-    manifest.fromHero.startFlight(shouldIncludedChildInPlaceholder: shouldIncludeChildInPlacehold);
+    manifest.fromHero.startFlight(shouldIncludedChildInPlaceholder: shouldIncludeChildInPlaceholder);
     manifest.toHero.startFlight();
     manifest.overlay.insert(overlayEntry = OverlayEntry(builder: _buildOverlay));
     _proxyAnimation.addListener(onTick);
@@ -776,10 +739,11 @@ class _HeroFlight {
       );
       shuttle = null;
 
-      if (newManifest.type == HeroFlightDirection.pop)
+      if (newManifest.type == HeroFlightDirection.pop) {
         _proxyAnimation.parent = ReverseAnimation(newManifest.animation);
-      else
+      } else {
         _proxyAnimation.parent = newManifest.animation;
+      }
 
       manifest.fromHero.endFlight(keepPlaceholder: true);
       manifest.toHero.endFlight(keepPlaceholder: true);
@@ -842,14 +806,15 @@ class HeroController extends NavigatorObserver {
     assert(route != null);
     // Don't trigger another flight when a pop is committed as a user gesture
     // back swipe is snapped.
-    if (!navigator!.userGestureInProgress)
+    if (!navigator!.userGestureInProgress) {
       _maybeStartHeroTransition(route, previousRoute, HeroFlightDirection.pop, false);
+    }
   }
 
   @override
   void didReplace({ Route<dynamic>? newRoute, Route<dynamic>? oldRoute }) {
     assert(navigator != null);
-    if (newRoute?.isCurrent == true) {
+    if (newRoute?.isCurrent ?? false) {
       // Only run hero animations if the top-most route got replaced.
       _maybeStartHeroTransition(oldRoute, newRoute, HeroFlightDirection.push, false);
     }
@@ -864,8 +829,9 @@ class HeroController extends NavigatorObserver {
 
   @override
   void didStopUserGesture() {
-    if (navigator!.userGestureInProgress)
+    if (navigator!.userGestureInProgress) {
       return;
+    }
 
     // When the user gesture ends, if the user horizontal drag gesture initiated
     // the flight (i.e. the back swipe) didn't move towards the pop direction at
@@ -900,17 +866,16 @@ class HeroController extends NavigatorObserver {
     if (toRoute != fromRoute && toRoute is PageRoute<dynamic> && fromRoute is PageRoute<dynamic>) {
       final PageRoute<dynamic> from = fromRoute;
       final PageRoute<dynamic> to = toRoute;
-      final Animation<double> animation = (flightType == HeroFlightDirection.push) ? to.animation! : from.animation!;
 
       // A user gesture may have already completed the pop, or we might be the initial route
       switch (flightType) {
         case HeroFlightDirection.pop:
-          if (animation.value == 0.0) {
+          if (from.animation!.value == 0.0) {
             return;
           }
           break;
         case HeroFlightDirection.push:
-          if (animation.value == 1.0) {
+          if (to.animation!.value == 1.0) {
             return;
           }
           break;
@@ -920,7 +885,7 @@ class HeroController extends NavigatorObserver {
       // maintainState = true, then the hero's final dimensions can be measured
       // immediately because their page's layout is still valid.
       if (isUserGestureTransition && flightType == HeroFlightDirection.pop && to.maintainState) {
-        _startHeroTransition(from, to, animation, flightType, isUserGestureTransition);
+        _startHeroTransition(from, to, flightType, isUserGestureTransition);
       } else {
         // Otherwise, delay measuring until the end of the next frame to allow
         // the 'to' route to build and layout.
@@ -930,8 +895,8 @@ class HeroController extends NavigatorObserver {
         // going to end up, and the `to` route will go back onstage.
         to.offstage = to.animation!.value == 0.0;
 
-        WidgetsBinding.instance!.addPostFrameCallback((Duration value) {
-          _startHeroTransition(from, to, animation, flightType, isUserGestureTransition);
+        WidgetsBinding.instance.addPostFrameCallback((Duration value) {
+          _startHeroTransition(from, to, flightType, isUserGestureTransition);
         });
       }
     }
@@ -942,7 +907,6 @@ class HeroController extends NavigatorObserver {
   void _startHeroTransition(
     PageRoute<dynamic> from,
     PageRoute<dynamic> to,
-    Animation<double> animation,
     HeroFlightDirection flightType,
     bool isUserGestureTransition,
   ) {
@@ -953,11 +917,12 @@ class HeroController extends NavigatorObserver {
     final NavigatorState? navigator = this.navigator;
     final OverlayState? overlay = navigator?.overlay;
     // If the navigator or the overlay was removed before this end-of-frame
-    // callback was called, then don't actually start a transition, and we don'
-    // t have to worry about any Hero widget we might have hidden in a previous
-    // flight, or onging flights.
-    if (navigator == null || overlay == null)
+    // callback was called, then don't actually start a transition, and we don't
+    // have to worry about any Hero widget we might have hidden in a previous
+    // flight, or ongoing flights.
+    if (navigator == null || overlay == null) {
       return;
+    }
 
     final RenderObject? navigatorRenderObject = navigator.context.findRenderObject();
 
@@ -1023,8 +988,9 @@ class HeroController extends NavigatorObserver {
     // This can happen in a route pop transition when a fromHero is no longer
     // mounted, or kept alive by the [KeepAlive] mechanism but no longer visible.
     // TODO(LongCatIsLooong): resume aborted flights: https://github.com/flutter/flutter/issues/72947
-    for (final _HeroState toHero in toHeroes.values)
+    for (final _HeroState toHero in toHeroes.values) {
       toHero.endFlight();
+    }
   }
 
   void _handleFlightEnded(_HeroFlight flight) {
@@ -1039,11 +1005,41 @@ class HeroController extends NavigatorObserver {
     BuildContext toHeroContext,
   ) {
     final Hero toHero = toHeroContext.widget as Hero;
-    return toHero.child;
+
+    final MediaQueryData? toMediaQueryData = MediaQuery.maybeOf(toHeroContext);
+    final MediaQueryData? fromMediaQueryData = MediaQuery.maybeOf(fromHeroContext);
+
+    if (toMediaQueryData == null || fromMediaQueryData == null) {
+      return toHero.child;
+    }
+
+    final EdgeInsets fromHeroPadding = fromMediaQueryData.padding;
+    final EdgeInsets toHeroPadding = toMediaQueryData.padding;
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: toMediaQueryData.copyWith(
+            padding: (flightDirection == HeroFlightDirection.push)
+              ? EdgeInsetsTween(
+                  begin: fromHeroPadding,
+                  end: toHeroPadding,
+                ).evaluate(animation)
+              : EdgeInsetsTween(
+                  begin: toHeroPadding,
+                  end: fromHeroPadding,
+                ).evaluate(animation),
+          ),
+          child: toHero.child);
+      },
+    );
   }
 }
 
 /// Enables or disables [Hero]es in the widget subtree.
+///
+/// {@youtube 560 315 https://www.youtube.com/watch?v=AaIASk2u1C0}
 ///
 /// When [enabled] is false, all [Hero] widgets in this subtree will not be
 /// involved in hero animations.
@@ -1055,12 +1051,11 @@ class HeroMode extends StatelessWidget {
   ///
   /// The [child] and [enabled] arguments must not be null.
   const HeroMode({
-    Key? key,
+    super.key,
     required this.child,
     this.enabled = true,
   }) : assert(child != null),
-       assert(enabled != null),
-       super(key: key);
+       assert(enabled != null);
 
   /// The subtree to place inside the [HeroMode].
   final Widget child;

@@ -2,43 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import '../../base/common.dart';
 import '../../base/file_system.dart';
-import '../../base/logger.dart';
 import '../../base/project_migrator.dart';
-import '../../project.dart';
 import '../../reporting/reporting.dart';
+import '../../xcode_project.dart';
 
 // Remove the linking and embedding logic from the Xcode project to give the tool more control over these.
 class RemoveMacOSFrameworkLinkAndEmbeddingMigration extends ProjectMigrator {
   RemoveMacOSFrameworkLinkAndEmbeddingMigration(
     MacOSProject project,
-    Logger logger,
+    super.logger,
     Usage usage,
   )   : _xcodeProjectInfoFile = project.xcodeProjectInfoFile,
-        _usage = usage,
-        super(logger);
+        _usage = usage;
 
   final File _xcodeProjectInfoFile;
   final Usage _usage;
 
   @override
-  bool migrate() {
+  void migrate() {
     if (!_xcodeProjectInfoFile.existsSync()) {
       logger.printTrace(
           'Xcode project not found, skipping framework link and embedding migration');
-      return true;
+      return;
     }
 
     processFileLines(_xcodeProjectInfoFile);
-
-    return true;
   }
 
   @override
-  String migrateLine(String line) {
+  String? migrateLine(String line) {
     // App.framework Frameworks reference.
     // isa = PBXFrameworksBuildPhase;
     // files = (

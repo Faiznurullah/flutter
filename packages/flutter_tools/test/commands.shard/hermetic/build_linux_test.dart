@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:args/command_runner.dart';
 import 'package:file/memory.dart';
 import 'package:file_testing/file_testing.dart';
@@ -28,7 +26,6 @@ import '../../src/test_flutter_command_runner.dart';
 const String _kTestFlutterRoot = '/flutter';
 
 final Platform linuxPlatform = FakePlatform(
-  operatingSystem: 'linux',
   environment: <String, String>{
     'FLUTTER_ROOT': _kTestFlutterRoot,
     'HOME': '/',
@@ -46,9 +43,9 @@ void main() {
     Cache.disableLocking();
   });
 
-  FileSystem fileSystem;
-  ProcessManager processManager;
-  TestUsage usage;
+  late FileSystem fileSystem;
+  late ProcessManager processManager;
+  late TestUsage usage;
 
   setUp(() {
     fileSystem = MemoryFileSystem.test();
@@ -72,14 +69,14 @@ void main() {
   // Returns the command matching the build_linux call to cmake.
   FakeCommand cmakeCommand(String buildMode, {
     String target = 'x64',
-    void Function() onRun,
+    void Function()? onRun,
   }) {
     return FakeCommand(
       command: <String>[
         'cmake',
         '-G',
         'Ninja',
-        '-DCMAKE_BUILD_TYPE=${toTitleCase(buildMode)}',
+        '-DCMAKE_BUILD_TYPE=${sentenceCase(buildMode)}',
         '-DFLUTTER_TARGET_PLATFORM=linux-$target',
         '/linux',
       ],
@@ -90,9 +87,9 @@ void main() {
 
   // Returns the command matching the build_linux call to ninja.
   FakeCommand ninjaCommand(String buildMode, {
-    Map<String, String> environment,
+    Map<String, String>? environment,
     String target = 'x64',
-    void Function() onRun,
+    void Function()? onRun,
     String stdout = '',
   }) {
     return FakeCommand(
@@ -115,7 +112,7 @@ void main() {
     expect(createTestCommandRunner(command).run(
       const <String>['build', 'linux', '--no-pub']
     ), throwsToolExit(message: 'No Linux desktop project configured. See '
-      'https://flutter.dev/desktop#add-desktop-support-to-an-existing-flutter-app '
+      'https://docs.flutter.dev/desktop#add-desktop-support-to-an-existing-flutter-app '
       'to learn about adding Linux support to a project.'));
   }, overrides: <Type, Generator>{
     Platform: () => linuxPlatform,
@@ -149,7 +146,7 @@ void main() {
     Platform: () => linuxPlatform,
     FileSystem: () => fileSystem,
     ProcessManager: () => FakeProcessManager.any(),
-    FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: false),
+    FeatureFlags: () => TestFeatureFlags(),
   });
 
   testUsingContext('Linux build invokes CMake and ninja, and writes temporary files', () async {
@@ -173,18 +170,15 @@ void main() {
     OperatingSystemUtils: () => FakeOperatingSystemUtils(),
   });
 
-  testUsingContext('Handles argument error from missing cmake', () async {
+  testUsingContext('Handles missing cmake', () async {
     final BuildCommand command = BuildCommand();
     setUpMockProjectFilesForBuild();
-    processManager = FakeProcessManager.list(<FakeCommand>[
-      cmakeCommand('release', onRun: () {
-        throw ArgumentError();
-      }),
-    ]);
+    processManager = FakeProcessManager.empty()
+        ..excludedExecutables.add('cmake');
 
     expect(createTestCommandRunner(command).run(
       const <String>['build', 'linux', '--no-pub']
-    ), throwsToolExit(message: "cmake not found. Run 'flutter doctor' for more information."));
+    ), throwsToolExit(message: 'CMake is required for Linux development.'));
   }, overrides: <Type, Generator>{
     FileSystem: () => fileSystem,
     ProcessManager: () => processManager,
@@ -228,6 +222,8 @@ void main() {
       const <String>['build', 'linux', '--debug', '--no-pub']
     );
     expect(testLogger.statusText, isNot(contains('STDOUT STUFF')));
+    expect(testLogger.warningText, isNot(contains('STDOUT STUFF')));
+    expect(testLogger.errorText, isNot(contains('STDOUT STUFF')));
     expect(testLogger.traceText, contains('STDOUT STUFF'));
   }, overrides: <Type, Generator>{
     FileSystem: () => fileSystem,
@@ -298,7 +294,7 @@ ERROR: No file or variants found for asset: images/a_dot_burr.jpeg
       cmakeCommand('debug'),
       ninjaCommand('debug',
         environment: const <String, String>{
-          'VERBOSE_SCRIPT_LOGGING': 'true'
+          'VERBOSE_SCRIPT_LOGGING': 'true',
         },
         stdout: 'STDOUT STUFF',
       ),
@@ -309,6 +305,8 @@ ERROR: No file or variants found for asset: images/a_dot_burr.jpeg
     );
     expect(testLogger.statusText, contains('STDOUT STUFF'));
     expect(testLogger.traceText, isNot(contains('STDOUT STUFF')));
+    expect(testLogger.warningText, isNot(contains('STDOUT STUFF')));
+    expect(testLogger.errorText, isNot(contains('STDOUT STUFF')));
   }, overrides: <Type, Generator>{
     FileSystem: () => fileSystem,
     ProcessManager: () => processManager,
@@ -447,6 +445,11 @@ ERROR: No file or variants found for asset: images/a_dot_burr.jpeg
     expect(configLines, containsAll(<String>[
       'file(TO_CMAKE_PATH "$_kTestFlutterRoot" FLUTTER_ROOT)',
       'file(TO_CMAKE_PATH "${fileSystem.currentDirectory.path}" PROJECT_DIR)',
+      'set(FLUTTER_VERSION "1.0.0" PARENT_SCOPE)',
+      'set(FLUTTER_VERSION_MAJOR 1 PARENT_SCOPE)',
+      'set(FLUTTER_VERSION_MINOR 0 PARENT_SCOPE)',
+      'set(FLUTTER_VERSION_PATCH 0 PARENT_SCOPE)',
+      'set(FLUTTER_VERSION_BUILD 0 PARENT_SCOPE)',
       '  "DART_DEFINES=Zm9vLmJhcj0y,Zml6ei5mYXI9Mw=="',
       '  "DART_OBFUSCATION=true"',
       '  "EXTRA_FRONT_END_OPTIONS=--enable-experiment=non-nullable"',
@@ -493,13 +496,13 @@ set(BINARY_NAME "fizz_bar")
     expect(() => runner.run(<String>['build', 'linux', '--no-pub']),
       throwsToolExit());
   }, overrides: <Type, Generator>{
-    FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: false),
+    FeatureFlags: () => TestFeatureFlags(),
   });
 
   testUsingContext('hidden when not enabled on Linux host', () {
     expect(BuildLinuxCommand(operatingSystemUtils: FakeOperatingSystemUtils()).hidden, true);
   }, overrides: <Type, Generator>{
-    FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: false),
+    FeatureFlags: () => TestFeatureFlags(),
     Platform: () => notLinuxPlatform,
   });
 

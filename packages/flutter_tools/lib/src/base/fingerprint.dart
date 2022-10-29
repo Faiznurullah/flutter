@@ -62,7 +62,9 @@ class Fingerprinter {
   void writeFingerprint() {
     try {
       final Fingerprint fingerprint = buildFingerprint();
-      _fileSystem.file(fingerprintPath).writeAsStringSync(fingerprint.toJson());
+      final File fingerprintFile = _fileSystem.file(fingerprintPath);
+      fingerprintFile.createSync(recursive: true);
+      fingerprintFile.writeAsStringSync(fingerprint.toJson());
     } on Exception catch (e) {
       // Log exception and continue, fingerprinting is only a performance improvement.
       _logger.printTrace('Fingerprint write error: $e');
@@ -86,7 +88,7 @@ class Fingerprint {
     final Iterable<File> files = inputPaths.map<File>(fileSystem.file);
     final Iterable<File> missingInputs = files.where((File file) => !file.existsSync());
     if (missingInputs.isNotEmpty) {
-      throw Exception('Missing input files:\n' + missingInputs.join('\n'));
+      throw Exception('Missing input files:\n${missingInputs.join('\n')}');
     }
     return Fingerprint._(
       checksums: <String, String>{
@@ -128,10 +130,7 @@ class Fingerprint {
   }
 
   @override
-  // Ignore map entries here to avoid becoming inconsistent with equals
-  // due to differences in map entry order. This is a really bad hash
-  // function and should eventually be deprecated and removed.
-  int get hashCode => _checksums.length.hashCode;
+  int get hashCode => Object.hash(Object.hashAllUnordered(_checksums.keys), Object.hashAllUnordered(_checksums.values));
 
   @override
   String toString() => '{checksums: $_checksums}';

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
+import 'package:file/file.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/os.dart';
@@ -20,9 +19,9 @@ import '../src/fakes.dart';
 
 /// Matches a doctor validation result.
 Matcher _matchDoctorValidation({
-  ValidationType validationType,
-  String statusInfo,
-  dynamic messages
+  required ValidationType validationType,
+  required String statusInfo,
+  required Object messages
 }) {
   return const TypeMatcher<ValidationResult>()
       .having((ValidationResult result) => result.type, 'type', validationType)
@@ -35,16 +34,17 @@ void main() {
     'downloaded and exits with code 1', () async {
     final FakeFlutterVersion flutterVersion = FakeFlutterVersion(
       frameworkVersion: '1.0.0',
+      channel: 'beta',
     );
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
     final Artifacts artifacts = Artifacts.test();
     final FlutterValidator flutterValidator = FlutterValidator(
       platform: FakePlatform(
-        operatingSystem: 'linux',
         localeName: 'en_US.UTF-8',
         environment: <String, String>{},
       ),
       flutterVersion: () => flutterVersion,
+        devToolsVersion: () => '2.8.0',
       userMessages: UserMessages(),
       artifacts: artifacts,
       fileSystem: fileSystem,
@@ -54,7 +54,7 @@ void main() {
         const FakeCommand(
           command: <String>['Artifact.genSnapshot'],
           exitCode: 1,
-        )
+        ),
       ])
     );
     fileSystem.file(artifacts.getArtifactPath(Artifact.genSnapshot)).createSync(recursive: true);
@@ -62,7 +62,7 @@ void main() {
 
     expect(await flutterValidator.validate(), _matchDoctorValidation(
       validationType: ValidationType.partial,
-      statusInfo: 'Channel unknown, 1.0.0, on Linux, locale en_US.UTF-8',
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
       messages: containsAll(const <ValidationMessage>[
         ValidationMessage.error(
           'Downloaded executables cannot execute on host.\n'
@@ -78,6 +78,7 @@ void main() {
   testWithoutContext('FlutterValidator does not run gen_snapshot binary check if it is not already downloaded', () async {
     final FakeFlutterVersion flutterVersion = FakeFlutterVersion(
       frameworkVersion: '1.0.0',
+      channel: 'beta',
     );
     final FlutterValidator flutterValidator = FlutterValidator(
       platform: FakePlatform(
@@ -86,6 +87,7 @@ void main() {
         environment: <String, String>{},
       ),
       flutterVersion: () => flutterVersion,
+      devToolsVersion: () => '2.8.0',
       userMessages: UserMessages(),
       artifacts: Artifacts.test(),
       fileSystem: MemoryFileSystem.test(),
@@ -98,7 +100,7 @@ void main() {
     // fail if the gen_snapshot binary is not present.
     expect(await flutterValidator.validate(), _matchDoctorValidation(
       validationType: ValidationType.installed,
-      statusInfo: 'Channel unknown, 1.0.0, on Windows, locale en_US.UTF-8',
+      statusInfo: 'Channel beta, 1.0.0, on Windows, locale en_US.UTF-8',
       messages: anything,
     ));
   });
@@ -107,6 +109,7 @@ void main() {
     final FlutterValidator flutterValidator = FlutterValidator(
       platform: FakePlatform(operatingSystem: 'windows', localeName: 'en_US.UTF-8'),
       flutterVersion: () => FakeThrowingFlutterVersion(),
+      devToolsVersion: () => '2.8.0',
       userMessages: UserMessages(),
       artifacts: Artifacts.test(),
       fileSystem: MemoryFileSystem.test(),
@@ -117,9 +120,9 @@ void main() {
 
     expect(await flutterValidator.validate(), _matchDoctorValidation(
       validationType: ValidationType.partial,
-      statusInfo: 'Channel unknown, 0.0.0, on Windows, locale en_US.UTF-8',
+      statusInfo: 'Channel beta, 0.0.0, on Windows, locale en_US.UTF-8',
       messages: containsAll(const <ValidationMessage>[
-        ValidationMessage('Flutter version 0.0.0 at sdk/flutter'),
+        ValidationMessage('Flutter version 0.0.0 on channel beta at sdk/flutter'),
         ValidationMessage.error('version error'),
       ]),
     ));
@@ -128,6 +131,7 @@ void main() {
   testWithoutContext('FlutterValidator shows mirrors on pub and flutter cloud storage', () async {
     final FakeFlutterVersion flutterVersion = FakeFlutterVersion(
       frameworkVersion: '1.0.0',
+      channel: 'beta',
     );
     final Platform platform = FakePlatform(
       operatingSystem: 'windows',
@@ -142,6 +146,7 @@ void main() {
     final FlutterValidator flutterValidator = FlutterValidator(
       platform: platform,
       flutterVersion: () => flutterVersion,
+        devToolsVersion: () => '2.8.0',
       userMessages: UserMessages(),
       artifacts: artifacts,
       fileSystem: fileSystem,
@@ -152,7 +157,7 @@ void main() {
 
     expect(await flutterValidator.validate(), _matchDoctorValidation(
       validationType: ValidationType.installed,
-      statusInfo: 'Channel unknown, 1.0.0, on Windows, locale en_US.UTF-8',
+      statusInfo: 'Channel beta, 1.0.0, on Windows, locale en_US.UTF-8',
       messages: containsAll(const <ValidationMessage>[
         ValidationMessage('Pub download mirror https://example.com/pub'),
         ValidationMessage('Flutter download mirror https://example.com/flutter'),
@@ -160,7 +165,7 @@ void main() {
     ));
   });
 
-  testWithoutContext('FlutterValidator shows FLUTTER_GIT_URL environment variable when set', () async {
+  testWithoutContext('FlutterValidator shows FLUTTER_GIT_URL when set and fails if upstream is not the same', () async {
     final FlutterValidator flutterValidator = FlutterValidator(
       platform: FakePlatform(
         localeName: 'en_US.UTF-8',
@@ -168,7 +173,199 @@ void main() {
           'FLUTTER_GIT_URL': 'https://githubmirror.com/flutter.git',
         },
       ),
-      flutterVersion: () => FakeFlutterVersion(frameworkVersion: '1.0.0'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        channel: 'beta'
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: MemoryFileSystem.test(),
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+      flutterRoot: () => 'sdk/flutter',
+    );
+
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.partial,
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: containsAll(const <ValidationMessage>[
+        ValidationMessage.hint('Upstream repository https://github.com/flutter/flutter.git is not the same as FLUTTER_GIT_URL'),
+        ValidationMessage('FLUTTER_GIT_URL = https://githubmirror.com/flutter.git'),
+        ValidationMessage(
+          'If those were intentional, you can disregard the above warnings; however it is '
+          'recommended to use "git" directly to perform update checks and upgrades.'
+        ),
+      ]),
+    ));
+  });
+
+  testWithoutContext('FlutterValidator fails when channel is unknown', () async {
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        // channel is unknown by default
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: MemoryFileSystem.test(),
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+      flutterRoot: () => 'sdk/flutter',
+    );
+
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.partial,
+      statusInfo: 'Channel unknown, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: containsAll(<ValidationMessage>[
+        const ValidationMessage.hint(
+          'Flutter version 1.0.0 on channel unknown at sdk/flutter\n'
+          'Currently on an unknown channel. Run `flutter channel` to switch to an official channel.\n'
+          "If that doesn't fix the issue, reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install."
+        ),
+        const ValidationMessage(
+          'If those were intentional, you can disregard the above warnings; however it is '
+          'recommended to use "git" directly to perform update checks and upgrades.'
+        ),
+      ]),
+    ));
+  });
+
+  testWithoutContext('FlutterValidator fails when framework version is unknown', () async {
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '0.0.0-unknown',
+        channel: 'beta',
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: MemoryFileSystem.test(),
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+      flutterRoot: () => 'sdk/flutter',
+    );
+
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.partial,
+      statusInfo: 'Channel beta, 0.0.0-unknown, on Linux, locale en_US.UTF-8',
+      messages: containsAll(<ValidationMessage>[
+        const ValidationMessage.hint(
+          'Flutter version 0.0.0-unknown on channel beta at sdk/flutter\n'
+          'Cannot resolve current version, possibly due to local changes.\n'
+          'Reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.'
+        ),
+        const ValidationMessage(
+          'If those were intentional, you can disregard the above warnings; however it is '
+          'recommended to use "git" directly to perform update checks and upgrades.'
+        ),
+      ]),
+    ));
+  });
+
+  group('FlutterValidator shows flutter upstream remote', () {
+    testWithoutContext('standard url', () async {
+      final FlutterValidator flutterValidator = FlutterValidator(
+        platform: FakePlatform(localeName: 'en_US.UTF-8'),
+        flutterVersion: () => FakeFlutterVersion(
+          frameworkVersion: '1.0.0',
+          channel: 'beta'
+        ),
+        devToolsVersion: () => '2.8.0',
+        userMessages: UserMessages(),
+        artifacts: Artifacts.test(),
+        fileSystem: MemoryFileSystem.test(),
+        processManager: FakeProcessManager.any(),
+        operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+        flutterRoot: () => 'sdk/flutter',
+      );
+
+      expect(await flutterValidator.validate(), _matchDoctorValidation(
+        validationType: ValidationType.installed,
+        statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+        messages: contains(const ValidationMessage('Upstream repository https://github.com/flutter/flutter.git')),
+      ));
+    });
+
+    testWithoutContext('non-standard url', () async {
+      final FlutterValidator flutterValidator = FlutterValidator(
+        platform: FakePlatform(localeName: 'en_US.UTF-8'),
+        flutterVersion: () => FakeFlutterVersion(
+          frameworkVersion: '1.0.0',
+          channel: 'beta',
+          repositoryUrl: 'https://githubmirror.com/flutter.git'
+        ),
+        devToolsVersion: () => '2.8.0',
+        userMessages: UserMessages(),
+        artifacts: Artifacts.test(),
+        fileSystem: MemoryFileSystem.test(),
+        processManager: FakeProcessManager.any(),
+        operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+        flutterRoot: () => 'sdk/flutter',
+      );
+
+      expect(await flutterValidator.validate(), _matchDoctorValidation(
+        validationType: ValidationType.partial,
+        statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+        messages: containsAll(<ValidationMessage>[
+          const ValidationMessage.hint(
+            'Upstream repository https://githubmirror.com/flutter.git is not a standard remote.\n'
+            'Set environment variable "FLUTTER_GIT_URL" to '
+            'https://githubmirror.com/flutter.git to dismiss this error.'
+          ),
+          const ValidationMessage(
+            'If those were intentional, you can disregard the above warnings; however it is '
+            'recommended to use "git" directly to perform update checks and upgrades.'
+          ),
+        ]),
+      ));
+    });
+
+    testWithoutContext('as unknown if upstream is null', () async {
+      final FlutterValidator flutterValidator = FlutterValidator(
+        platform: FakePlatform(localeName: 'en_US.UTF-8'),
+        flutterVersion: () => FakeFlutterVersion(
+          frameworkVersion: '1.0.0',
+          channel: 'beta',
+          repositoryUrl: null,
+        ),
+        devToolsVersion: () => '2.8.0',
+        userMessages: UserMessages(),
+        artifacts: Artifacts.test(),
+        fileSystem: MemoryFileSystem.test(),
+        processManager: FakeProcessManager.any(),
+        operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
+        flutterRoot: () => 'sdk/flutter',
+      );
+
+      expect(await flutterValidator.validate(), _matchDoctorValidation(
+        validationType: ValidationType.partial,
+        statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+        messages: containsAll(<ValidationMessage>[
+          const ValidationMessage.hint(
+            'Unknown upstream repository.\n'
+            'Reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.'
+          ),
+          const ValidationMessage(
+            'If those were intentional, you can disregard the above warnings; however it is '
+            'recommended to use "git" directly to perform update checks and upgrades.'
+          ),
+        ]),
+      ));
+    });
+  });
+
+  testWithoutContext('Do not show the message for intentional errors if FlutterValidator passes', () async {
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        channel: 'beta'
+      ),
+      devToolsVersion: () => '2.8.0',
       userMessages: UserMessages(),
       artifacts: Artifacts.test(),
       fileSystem: MemoryFileSystem.test(),
@@ -179,57 +376,131 @@ void main() {
 
     expect(await flutterValidator.validate(), _matchDoctorValidation(
       validationType: ValidationType.installed,
-      statusInfo: 'Channel unknown, 1.0.0, on Linux, locale en_US.UTF-8',
-      messages: contains(const ValidationMessage('FLUTTER_GIT_URL = https://githubmirror.com/flutter.git')),
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: isNot(
+        contains(const ValidationMessage(
+          'If those were intentional, you can disregard the above warnings; however it is '
+          'recommended to use "git" directly to perform update checks and upgrades.'
+        )),
+      ),
     ));
   });
 
-  group('FlutterValidator shows flutter upstream remote', () {
-    testWithoutContext('default url', () async {
-      final FlutterValidator flutterValidator = FlutterValidator(
-        platform: FakePlatform(localeName: 'en_US.UTF-8'),
-        flutterVersion: () => FakeFlutterVersion(frameworkVersion: '1.0.0'),
-        userMessages: UserMessages(),
-        artifacts: Artifacts.test(),
-        fileSystem: MemoryFileSystem.test(),
-        processManager: FakeProcessManager.any(),
-        operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
-        flutterRoot: () => 'sdk/flutter',
-      );
+  testWithoutContext('detects no flutter and dart on path', () async {
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        channel: 'beta'
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: MemoryFileSystem.test(),
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(
+        name: 'Linux',
+        whichLookup: const <String, File>{},
+      ),
+      flutterRoot: () => 'sdk/flutter',
+    );
 
-      expect(await flutterValidator.validate(), _matchDoctorValidation(
-        validationType: ValidationType.installed,
-        statusInfo: 'Channel unknown, 1.0.0, on Linux, locale en_US.UTF-8',
-        messages: contains(const ValidationMessage('Upstream repository https://github.com/flutter/flutter.git')),
-      ));
-    });
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.partial,
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: contains(const ValidationMessage.hint(
+        'The flutter binary is not on your path. Consider adding sdk/flutter/bin to your path.',
+      )),
+    ));
+  });
 
-    testWithoutContext('unknown url if upstream is null', () async {
-      final FlutterValidator flutterValidator = FlutterValidator(
-        platform: FakePlatform(localeName: 'en_US.UTF-8'),
-        flutterVersion: () => FakeFlutterVersion(
-          frameworkVersion: '1.0.0',
-          repositoryUrl: null,
-        ),
-        userMessages: UserMessages(),
-        artifacts: Artifacts.test(),
-        fileSystem: MemoryFileSystem.test(),
-        processManager: FakeProcessManager.any(),
-        operatingSystemUtils: FakeOperatingSystemUtils(name: 'Linux'),
-        flutterRoot: () => 'sdk/flutter',
-      );
+  testWithoutContext('detects flutter and dart from outside flutter sdk', () async {
+    final FileSystem fs = MemoryFileSystem.test();
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        channel: 'beta'
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: fs,
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(
+        name: 'Linux',
+        whichLookup: <String, File>{
+          'flutter': fs.file('/usr/bin/flutter')..createSync(recursive: true),
+          'dart': fs.file('/usr/bin/dart')..createSync(recursive: true),
+        },
+      ),
+      flutterRoot: () => 'sdk/flutter',
+    );
 
-      expect(await flutterValidator.validate(), _matchDoctorValidation(
-        validationType: ValidationType.installed,
-        statusInfo: 'Channel unknown, 1.0.0, on Linux, locale en_US.UTF-8',
-        messages: contains(const ValidationMessage('Upstream repository unknown')),
-      ));
-    });
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.partial,
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: contains(const ValidationMessage.hint(
+        'Warning: `flutter` on your path resolves to /usr/bin/flutter, which '
+        'is not inside your current Flutter SDK checkout at sdk/flutter. '
+        'Consider adding sdk/flutter/bin to the front of your path.',
+      )),
+    ));
+  });
+
+  testWithoutContext('no warnings if flutter & dart binaries are inside the Flutter SDK', () async {
+    final FileSystem fs = MemoryFileSystem.test();
+    final FlutterValidator flutterValidator = FlutterValidator(
+      platform: FakePlatform(localeName: 'en_US.UTF-8'),
+      flutterVersion: () => FakeFlutterVersion(
+        frameworkVersion: '1.0.0',
+        channel: 'beta'
+      ),
+      devToolsVersion: () => '2.8.0',
+      userMessages: UserMessages(),
+      artifacts: Artifacts.test(),
+      fileSystem: fs,
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(
+        name: 'Linux',
+        whichLookup: <String, File>{
+          'flutter': fs.file('/sdk/flutter/bin/flutter')..createSync(recursive: true),
+          'dart': fs.file('/sdk/flutter/bin/dart')..createSync(recursive: true),
+        },
+      ),
+      flutterRoot: () => '/sdk/flutter',
+    );
+
+    expect(await flutterValidator.validate(), _matchDoctorValidation(
+      validationType: ValidationType.installed,
+      statusInfo: 'Channel beta, 1.0.0, on Linux, locale en_US.UTF-8',
+      messages: isNot(contains(isA<ValidationMessage>().having(
+        (ValidationMessage message) => message.message,
+        'message',
+        contains('Consider adding /sdk/flutter/bin to the front of your path'),
+      ))),
+    ));
   });
 }
 
 class FakeOperatingSystemUtils extends Fake implements OperatingSystemUtils {
-  FakeOperatingSystemUtils({this.name});
+  FakeOperatingSystemUtils({
+    required this.name,
+    this.whichLookup,
+    FileSystem? fs,
+  }) {
+    fs ??= MemoryFileSystem.test();
+    whichLookup ??= <String, File>{
+      'flutter': fs.file('/sdk/flutter/bin/flutter')..createSync(recursive: true),
+      'dart': fs.file('/sdk/flutter/bin/dart')..createSync(recursive: true),
+    };
+  }
+
+  /// A map of [File]s that calls to [which] will return.
+  Map<String, File>? whichLookup;
+
+  @override
+  File? which(String execName) => whichLookup![execName];
 
   @override
   final String name;
@@ -237,7 +508,10 @@ class FakeOperatingSystemUtils extends Fake implements OperatingSystemUtils {
 
 class FakeThrowingFlutterVersion extends FakeFlutterVersion {
   @override
-   String get frameworkCommitDate {
-     throw VersionCheckError('version error');
-   }
+  String get channel => 'beta';
+
+  @override
+  String get frameworkCommitDate {
+    throw VersionCheckError('version error');
+  }
 }

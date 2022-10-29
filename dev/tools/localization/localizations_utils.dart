@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'dart:convert';
 import 'dart:io';
 
@@ -23,11 +21,11 @@ int sortFilesByPath (FileSystemEntity a, FileSystemEntity b) {
 @immutable
 class LocaleInfo implements Comparable<LocaleInfo> {
   const LocaleInfo({
-    this.languageCode,
+    required this.languageCode,
     this.scriptCode,
     this.countryCode,
-    this.length,
-    this.originalString,
+    required this.length,
+    required this.originalString,
   });
 
   /// Simple parser. Expects the locale string to be in the form of 'language_script_COUNTRY'
@@ -42,8 +40,8 @@ class LocaleInfo implements Comparable<LocaleInfo> {
     final List<String> codes = locale.split('_'); // [language, script, country]
     assert(codes.isNotEmpty && codes.length < 4);
     final String languageCode = codes[0];
-    String scriptCode;
-    String countryCode;
+    String? scriptCode;
+    String? countryCode;
     int length = codes.length;
     String originalString = locale;
     if (codes.length == 2) {
@@ -95,10 +93,12 @@ class LocaleInfo implements Comparable<LocaleInfo> {
       }
       // Update the base string to reflect assumed scriptCodes.
       originalString = languageCode;
-      if (scriptCode != null)
-        originalString += '_' + scriptCode;
-      if (countryCode != null)
-        originalString += '_' + countryCode;
+      if (scriptCode != null) {
+        originalString += '_$scriptCode';
+      }
+      if (countryCode != null) {
+        originalString += '_$countryCode';
+      }
     }
 
     return LocaleInfo(
@@ -111,8 +111,8 @@ class LocaleInfo implements Comparable<LocaleInfo> {
   }
 
   final String languageCode;
-  final String scriptCode;
-  final String countryCode;
+  final String? scriptCode;
+  final String? countryCode;
   final int length;             // The number of fields. Ranges from 1-3.
   final String originalString;  // Original un-parsed locale string.
 
@@ -120,7 +120,7 @@ class LocaleInfo implements Comparable<LocaleInfo> {
     return originalString
       .split('_')
       .map<String>((String part) => part.substring(0, 1).toUpperCase() + part.substring(1).toLowerCase())
-      .join('');
+      .join();
   }
 
   @override
@@ -130,9 +130,7 @@ class LocaleInfo implements Comparable<LocaleInfo> {
   }
 
   @override
-  int get hashCode {
-    return originalString.hashCode;
-  }
+  int get hashCode => originalString.hashCode;
 
   @override
   String toString() {
@@ -148,10 +146,10 @@ class LocaleInfo implements Comparable<LocaleInfo> {
 /// Parse the data for a locale from a file, and store it in the [attributes]
 /// and [resources] keys.
 void loadMatchingArbsIntoBundleMaps({
-  @required Directory directory,
-  @required RegExp filenamePattern,
-  @required Map<LocaleInfo, Map<String, String>> localeToResources,
-  @required Map<LocaleInfo, Map<String, dynamic>> localeToResourceAttributes,
+  required Directory directory,
+  required RegExp filenamePattern,
+  required Map<LocaleInfo, Map<String, String>> localeToResources,
+  required Map<LocaleInfo, Map<String, dynamic>> localeToResourceAttributes,
 }) {
   assert(directory != null);
   assert(filenamePattern != null);
@@ -169,20 +167,21 @@ void loadMatchingArbsIntoBundleMaps({
   for (final FileSystemEntity entity in directory.listSync().toList()..sort(sortFilesByPath)) {
     final String entityPath = entity.path;
     if (FileSystemEntity.isFileSync(entityPath) && filenamePattern.hasMatch(entityPath)) {
-      final String localeString = filenamePattern.firstMatch(entityPath)[1];
+      final String localeString = filenamePattern.firstMatch(entityPath)![1]!;
       final File arbFile = File(entityPath);
 
       // Helper method to fill the maps with the correct data from file.
       void populateResources(LocaleInfo locale, File file) {
-        final Map<String, String> resources = localeToResources[locale];
-        final Map<String, dynamic> attributes = localeToResourceAttributes[locale];
+        final Map<String, String> resources = localeToResources[locale]!;
+        final Map<String, dynamic> attributes = localeToResourceAttributes[locale]!;
         final Map<String, dynamic> bundle = json.decode(file.readAsStringSync()) as Map<String, dynamic>;
         for (final String key in bundle.keys) {
           // The ARB file resource "attributes" for foo are called @foo.
-          if (key.startsWith('@'))
+          if (key.startsWith('@')) {
             attributes[key.substring(1)] = bundle[key];
-          else
+          } else {
             resources[key] = bundle[key] as String;
+          }
         }
       }
       // Only pre-assume scriptCode if there is a country or script code to assume off of.
@@ -202,7 +201,7 @@ void loadMatchingArbsIntoBundleMaps({
       // Add an assumed locale to default to when there is no info on scriptOnly locales.
       locale = LocaleInfo.fromString(localeString, deriveScriptCode: true);
       if (locale.scriptCode != null) {
-        final LocaleInfo scriptLocale = LocaleInfo.fromString(locale.languageCode + '_' + locale.scriptCode);
+        final LocaleInfo scriptLocale = LocaleInfo.fromString('${locale.languageCode}_${locale.scriptCode}');
         if (!localeToResources.containsKey(scriptLocale)) {
           assumedLocales.add(scriptLocale);
           localeToResources[scriptLocale] ??= <String, String>{};
@@ -234,36 +233,55 @@ void checkCwdIsRepoRoot(String commandName) {
 GeneratorOptions parseArgs(List<String> rawArgs) {
   final argslib.ArgParser argParser = argslib.ArgParser()
     ..addFlag(
+      'help',
+      abbr: 'h',
+      help: 'Print the usage message for this command',
+    )
+    ..addFlag(
       'overwrite',
       abbr: 'w',
-      defaultsTo: false,
+      help: 'Overwrite existing localizations',
+    )
+    ..addFlag(
+      'remove-undefined',
+      help: 'Remove any localizations that are not defined in the canonical locale.',
     )
     ..addFlag(
       'material',
       help: 'Whether to print the generated classes for the Material package only. Ignored when --overwrite is passed.',
-      defaultsTo: false,
     )
     ..addFlag(
       'cupertino',
       help: 'Whether to print the generated classes for the Cupertino package only. Ignored when --overwrite is passed.',
-      defaultsTo: false,
     );
   final argslib.ArgResults args = argParser.parse(rawArgs);
+  if (args.wasParsed('help') && args['help'] == true) {
+    stderr.writeln(argParser.usage);
+    exit(0);
+  }
   final bool writeToFile = args['overwrite'] as bool;
+  final bool removeUndefined = args['remove-undefined'] as bool;
   final bool materialOnly = args['material'] as bool;
   final bool cupertinoOnly = args['cupertino'] as bool;
 
-  return GeneratorOptions(writeToFile: writeToFile, materialOnly: materialOnly, cupertinoOnly: cupertinoOnly);
+  return GeneratorOptions(
+    writeToFile: writeToFile,
+    materialOnly: materialOnly,
+    cupertinoOnly: cupertinoOnly,
+    removeUndefined: removeUndefined,
+  );
 }
 
 class GeneratorOptions {
   GeneratorOptions({
-    @required this.writeToFile,
-    @required this.materialOnly,
-    @required this.cupertinoOnly,
+    required this.writeToFile,
+    required this.removeUndefined,
+    required this.materialOnly,
+    required this.cupertinoOnly,
   });
 
   final bool writeToFile;
+  final bool removeUndefined;
   final bool materialOnly;
   final bool cupertinoOnly;
 }
@@ -271,21 +289,23 @@ class GeneratorOptions {
 // See also //master/tools/gen_locale.dart in the engine repo.
 Map<String, List<String>> _parseSection(String section) {
   final Map<String, List<String>> result = <String, List<String>>{};
-  List<String> lastHeading;
+  late List<String> lastHeading;
   for (final String line in section.split('\n')) {
-    if (line == '')
+    if (line == '') {
       continue;
+    }
     if (line.startsWith('  ')) {
       lastHeading[lastHeading.length - 1] = '${lastHeading.last}${line.substring(1)}';
       continue;
     }
     final int colon = line.indexOf(':');
-    if (colon <= 0)
+    if (colon <= 0) {
       throw 'not sure how to deal with "$line"';
+    }
     final String name = line.substring(0, colon);
     final String value = line.substring(colon + 2);
     lastHeading = result.putIfAbsent(name, () => <String>[]);
-    result[name].add(value);
+    result[name]!.add(value);
   }
   return result;
 }
@@ -304,19 +324,23 @@ void precacheLanguageAndRegionTags() {
       languageSubtagRegistry.split('%%').skip(1).map<Map<String, List<String>>>(_parseSection).toList();
   for (final Map<String, List<String>> section in sections) {
     assert(section.containsKey('Type'), section.toString());
-    final String type = section['Type'].single;
+    final String type = section['Type']!.single;
     if (type == 'language' || type == 'region' || type == 'script') {
       assert(section.containsKey('Subtag') && section.containsKey('Description'), section.toString());
-      final String subtag = section['Subtag'].single;
-      String description = section['Description'].join(' ');
-      if (description.startsWith('United '))
+      final String subtag = section['Subtag']!.single;
+      String description = section['Description']!.join(' ');
+      if (description.startsWith('United ')) {
         description = 'the $description';
-      if (description.contains(kParentheticalPrefix))
+      }
+      if (description.contains(kParentheticalPrefix)) {
         description = description.substring(0, description.indexOf(kParentheticalPrefix));
-      if (description.contains(kProvincePrefix))
+      }
+      if (description.contains(kProvincePrefix)) {
         description = description.substring(0, description.indexOf(kProvincePrefix));
-      if (description.endsWith(' Republic'))
+      }
+      if (description.endsWith(' Republic')) {
         description = 'the $description';
+      }
       switch (type) {
         case 'language':
           _languages[subtag] = description;
@@ -336,10 +360,10 @@ String describeLocale(String tag) {
   final List<String> subtags = tag.split('_');
   assert(subtags.isNotEmpty);
   assert(_languages.containsKey(subtags[0]));
-  final String language = _languages[subtags[0]];
+  final String language = _languages[subtags[0]]!;
   String output = language;
-  String region;
-  String script;
+  String? region;
+  String? script;
   if (subtags.length == 2) {
     region = _regions[subtags[1]];
     script = _scripts[subtags[1]];
@@ -349,10 +373,12 @@ String describeLocale(String tag) {
     script = _scripts[subtags[1]];
     assert(region != null && script != null);
   }
-  if (region != null)
+  if (region != null) {
     output += ', as used in $region';
-  if (script != null)
+  }
+  if (script != null) {
     output += ', using the $script script';
+  }
   return output;
 }
 
@@ -434,9 +460,10 @@ String generateString(String value) {
 /// Only used to generate localization strings for the Kannada locale ('kn') because
 /// some of the localized strings contain characters that can crash Emacs on Linux.
 /// See packages/flutter_localizations/lib/src/l10n/README for more information.
-String generateEncodedString(String locale, String value) {
-  if (locale != 'kn' || value.runes.every((int code) => code <= 0xFF))
+String generateEncodedString(String? locale, String value) {
+  if (locale != 'kn' || value.runes.every((int code) => code <= 0xFF)) {
     return generateString(value);
+  }
 
   final String unicodeEscapes = value.runes.map((int code) => '\\u{${code.toRadixString(16)}}').join();
   return "'$unicodeEscapes'";

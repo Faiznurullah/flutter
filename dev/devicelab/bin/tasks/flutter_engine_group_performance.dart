@@ -4,8 +4,7 @@
 
 import 'dart:io';
 
-import 'package:flutter_devicelab/common.dart';
-import 'package:flutter_devicelab/framework/adb.dart';
+import 'package:flutter_devicelab/framework/devices.dart';
 import 'package:flutter_devicelab/framework/framework.dart';
 import 'package:flutter_devicelab/framework/task_result.dart';
 import 'package:flutter_devicelab/framework/utils.dart' as utils;
@@ -72,7 +71,7 @@ Future<TaskResult> _doTest() async {
     final String apkPath = path.join(multipleFluttersPath, 'android', 'app',
         'build', 'outputs', 'apk', 'release', 'app-release.apk');
 
-    TaskResult result;
+    TaskResult? result;
     await _withApkInstall(apkPath, _bundleName, (AndroidDevice device) async {
       final List<int> totalMemorySamples = <int>[];
       for (int i = 0; i < _numberOfIterations; ++i) {
@@ -81,7 +80,7 @@ Future<TaskResult> _doTest() async {
           'am',
           'start',
           '-n',
-          '$_bundleName/$_bundleName.$_activityName'
+          '$_bundleName/$_bundleName.$_activityName',
         ]);
         await Future<void>.delayed(const Duration(seconds: 10));
         final Map<String, dynamic> memoryStats =
@@ -94,7 +93,7 @@ Future<TaskResult> _doTest() async {
           ListStatistics(totalMemorySamples);
 
       final Map<String, dynamic> results = <String, dynamic>{
-        ...totalMemoryStatistics.asMap('totalMemory')
+        ...totalMemoryStatistics.asMap('totalMemory'),
       };
       result = TaskResult.success(results,
           benchmarkScoreKeys: results.keys.toList());
@@ -107,5 +106,5 @@ Future<TaskResult> _doTest() async {
 }
 
 Future<void> main() async {
-  unawaited(task(_doTest));
+  await task(_doTest);
 }

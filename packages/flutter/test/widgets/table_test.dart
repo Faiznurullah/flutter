@@ -7,7 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class TestStatefulWidget extends StatefulWidget {
-  const TestStatefulWidget({ Key? key }) : super(key: key);
+  const TestStatefulWidget({ super.key });
 
   @override
   TestStatefulWidgetState createState() => TestStatefulWidgetState();
@@ -19,7 +19,7 @@ class TestStatefulWidgetState extends State<TestStatefulWidget> {
 }
 
 class TestChildWidget extends StatefulWidget {
-  const TestChildWidget({ Key? key }) : super(key: key);
+  const TestChildWidget({ super.key });
 
   @override
   TestChildState createState() => TestChildState();
@@ -386,7 +386,7 @@ void main() {
           textDirection: TextDirection.ltr,
           child: Table(
             columnWidths: const <int, TableColumnWidth>{
-              0: FlexColumnWidth(1.0),
+              0: FlexColumnWidth(),
               1: FlexColumnWidth(0.123),
               2: FlexColumnWidth(0.123),
               3: FlexColumnWidth(0.123),

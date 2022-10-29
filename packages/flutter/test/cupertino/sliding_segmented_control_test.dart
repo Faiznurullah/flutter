@@ -5,30 +5,51 @@
 import 'dart:collection';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../widgets/semantics_tester.dart';
 
-dynamic getRenderSegmentedControl(WidgetTester tester) {
+RenderBox getRenderSegmentedControl(WidgetTester tester) {
   return tester.allRenderObjects.firstWhere(
     (RenderObject currentObject) {
       return currentObject.toStringShort().contains('_RenderSegmentedControl');
     },
-  );
+  ) as RenderBox;
 }
 
 Rect currentUnscaledThumbRect(WidgetTester tester, { bool useGlobalCoordinate = false }) {
   final dynamic renderSegmentedControl = getRenderSegmentedControl(tester);
+  // Using dynamic to access private class in test.
+  // ignore: avoid_dynamic_calls
   final Rect local = renderSegmentedControl.currentThumbRect as Rect;
-  if (!useGlobalCoordinate)
+  if (!useGlobalCoordinate) {
     return local;
+  }
 
   final RenderBox segmentedControl = renderSegmentedControl as RenderBox;
   return local.shift(segmentedControl.localToGlobal(Offset.zero));
 }
 
-double currentThumbScale(WidgetTester tester) => getRenderSegmentedControl(tester).thumbScale as double;
+int? getHighlightedIndex(WidgetTester tester) {
+  // Using dynamic to access private class in test.
+  // ignore: avoid_dynamic_calls
+  return (getRenderSegmentedControl(tester) as dynamic).highlightedIndex as int?;
+}
+
+Color getThumbColor(WidgetTester tester) {
+  // Using dynamic to access private class in test.
+  // ignore: avoid_dynamic_calls
+  return (getRenderSegmentedControl(tester) as dynamic).thumbColor as Color;
+}
+
+double currentThumbScale(WidgetTester tester) {
+  // Using dynamic to access private class in test.
+  // ignore: avoid_dynamic_calls
+  return (getRenderSegmentedControl(tester) as dynamic).thumbScale as double;
+}
 
 Widget setupSimpleSegmentedControl() {
   const Map<int, Widget> children = <int, Widget>{
@@ -308,7 +329,7 @@ void main() {
       matching: find.byType(Container),
     )).decoration! as BoxDecoration;
 
-    expect(getRenderSegmentedControl(tester).thumbColor.value, CupertinoColors.systemGreen.color.value);
+    expect(getThumbColor(tester).value, CupertinoColors.systemGreen.color.value);
     expect(decoration.color!.value, CupertinoColors.systemRed.color.value);
 
     setState(() { brightness = Brightness.dark; });
@@ -320,7 +341,7 @@ void main() {
     )).decoration! as BoxDecoration;
 
 
-    expect(getRenderSegmentedControl(tester).thumbColor.value, CupertinoColors.systemGreen.darkColor.value);
+    expect(getThumbColor(tester).value, CupertinoColors.systemGreen.darkColor.value);
     expect(decorationDark.color!.value, CupertinoColors.systemRed.darkColor.value);
   });
 
@@ -351,7 +372,7 @@ void main() {
   testWidgets('Passed in value is child initially selected', (WidgetTester tester) async {
     await tester.pumpWidget(setupSimpleSegmentedControl());
 
-    expect(getRenderSegmentedControl(tester).highlightedIndex, 0);
+    expect(getHighlightedIndex(tester), 0);
   });
 
   testWidgets('Null input for value results in no child initially selected', (WidgetTester tester) async {
@@ -377,7 +398,7 @@ void main() {
       ),
     );
 
-    expect(getRenderSegmentedControl(tester).highlightedIndex, null);
+    expect(getHighlightedIndex(tester), null);
   });
 
   testWidgets('Long press not-selected child interactions', (WidgetTester tester) async {
@@ -606,17 +627,17 @@ void main() {
     );
 
     // highlightedIndex is 1 instead of 0 because of RTL.
-    expect(getRenderSegmentedControl(tester).highlightedIndex, 1);
+    expect(getHighlightedIndex(tester), 1);
 
     await tester.tap(find.text('Child 2'));
     await tester.pump();
 
-    expect(getRenderSegmentedControl(tester).highlightedIndex, 0);
+    expect(getHighlightedIndex(tester), 0);
 
     await tester.tap(find.text('Child 2'));
     await tester.pump();
 
-    expect(getRenderSegmentedControl(tester).highlightedIndex, 0);
+    expect(getHighlightedIndex(tester), 0);
   });
 
   testWidgets('Segmented control semantics', (WidgetTester tester) async {
@@ -894,7 +915,7 @@ void main() {
         },
       ));
 
-      final RenderBox renderSegmentedControl = getRenderSegmentedControl(tester) as RenderBox;
+      final RenderBox renderSegmentedControl = getRenderSegmentedControl(tester);
       final Offset segmentedControlOrigin = renderSegmentedControl.localToGlobal(Offset.zero);
 
       // Expect the segmented control to be much narrower.
@@ -1185,7 +1206,7 @@ void main() {
       ),
     );
 
-    final RenderBox renderBox = getRenderSegmentedControl(tester) as RenderBox;
+    final RenderBox renderBox = getRenderSegmentedControl(tester);
 
     final Size size = renderBox.getDryLayout(const BoxConstraints());
     expect(size.width, greaterThan(10));
@@ -1214,7 +1235,7 @@ void main() {
       ),
     );
 
-    final RenderBox renderBox = getRenderSegmentedControl(tester) as RenderBox;
+    final RenderBox renderBox = getRenderSegmentedControl(tester);
     final Size size = renderBox.size;
 
     for (final int value in children.keys) {
@@ -1225,7 +1246,6 @@ void main() {
       expect(renderBox.size, size);
     }
   });
-
 
   testWidgets('ScrollView + SlidingSegmentedControl interaction', (WidgetTester tester) async {
     const Map<int, Widget> children = <int, Widget>{
@@ -1311,5 +1331,38 @@ void main() {
 
     expect(scrollController.offset, 0);
     expect(groupValue, 1);
+  });
+
+  testWidgets('Hovering over Cupertino sliding segmented control updates cursor to clickable on Web', (WidgetTester tester) async {
+    const Map<int, Widget> children = <int, Widget>{
+      0: Text('A'),
+      1: Text('BB'),
+      2: Text('CCCC'),
+    };
+
+    await tester.pumpWidget(
+      boilerplate(
+        builder: (BuildContext context) {
+          return CupertinoSlidingSegmentedControl<int>(
+            key: const ValueKey<String>('Segmented Control'),
+            children: children,
+            onValueChanged: defaultCallback,
+          );
+        },
+      ),
+    );
+
+    final TestGesture gesture = await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+    await gesture.addPointer(location: const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1), SystemMouseCursors.basic);
+
+    final Offset firstChild = tester.getCenter(find.text('A'));
+    await gesture.moveTo(firstChild);
+    await tester.pumpAndSettle();
+    expect(
+      RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+      kIsWeb ? SystemMouseCursors.click : SystemMouseCursors.basic,
+    );
   });
 }

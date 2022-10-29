@@ -99,8 +99,9 @@ DropdownButton<String>(
     // null indicates the user didn't select a
     // new value.
     setState(() {
-      if (newValue != null)
+      if (newValue != null) {
         dropdownValue = newValue;
+      }
     });
   },
   items: <String>['One', 'Two', 'Free', 'Four']
@@ -253,7 +254,6 @@ class GridLists {
 // loaded from the web.
 GridView.count(
   crossAxisCount: 3,
-  childAspectRatio: 1.0,
   padding: const EdgeInsets.all(4.0),
   mainAxisSpacing: 4.0,
   crossAxisSpacing: 4.0,

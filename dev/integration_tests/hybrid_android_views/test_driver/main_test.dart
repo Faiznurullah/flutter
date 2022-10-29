@@ -6,7 +6,7 @@ import 'package:flutter_driver/flutter_driver.dart';
 import 'package:test/test.dart' hide TypeMatcher, isInstanceOf;
 
 Future<void> main() async {
-  FlutterDriver driver;
+  late FlutterDriver driver;
 
   setUpAll(() async {
     driver = await FlutterDriver.connect();
@@ -25,7 +25,7 @@ Future<void> main() async {
     expect(errorMessage, '');
     final SerializableFinder backButton = find.byValueKey('back');
     await driver.tap(backButton);
-  });
+  }, timeout: Timeout.none);
 
   group('Nested View Event', () {
     setUpAll(() async {
@@ -45,7 +45,7 @@ Future<void> main() async {
       await driver.tap(showAlertDialog);
       final String status = await driver.getText(find.byValueKey('Status'));
       expect(status, 'Success');
-    });
+    }, timeout: Timeout.none);
 
     test('Child view can handle touches', () async {
       final SerializableFinder addChildView = find.byValueKey('AddChildView');
@@ -56,13 +56,61 @@ Future<void> main() async {
       final String nestedViewClickCount =
         await driver.getText(find.byValueKey('NestedViewClickCount'));
       expect(nestedViewClickCount, 'Click count: 1');
-    });
+    }, timeout: Timeout.none);
   });
 
-  group('Flutter surface switch', () {
+  group('Flutter surface without hybrid composition', () {
     setUpAll(() async {
-      final SerializableFinder wmListTile = find.byValueKey('NestedViewEventTile');
-      await driver.tap(wmListTile);
+      await driver.tap(find.byValueKey('NestedViewEventTile'));
+    });
+
+    tearDownAll(() async {
+      await driver.waitFor(find.pageBack());
+      await driver.tap(find.pageBack());
+    });
+
+    test('Uses FlutterSurfaceView when Android view is on the screen', () async {
+      await driver.waitFor(find.byValueKey('PlatformView'));
+
+      expect(
+        await driver.requestData('hierarchy'),
+        '|-FlutterView\n'
+        '  |-FlutterSurfaceView\n' // Flutter UI
+        '  |-ViewGroup\n'  // Platform View
+        '    |-ViewGroup\n'
+      );
+
+      // Hide platform view.
+      final SerializableFinder togglePlatformView = find.byValueKey('TogglePlatformView');
+      await driver.tap(togglePlatformView);
+      await driver.waitForAbsent(find.byValueKey('PlatformView'));
+
+      expect(
+        await driver.requestData('hierarchy'),
+        '|-FlutterView\n'
+        '  |-FlutterSurfaceView\n' // Just the Flutter UI
+      );
+
+      // Show platform view again.
+      await driver.tap(togglePlatformView);
+      await driver.waitFor(find.byValueKey('PlatformView'));
+
+      expect(
+        await driver.requestData('hierarchy'),
+        '|-FlutterView\n'
+        '  |-FlutterSurfaceView\n' // Flutter UI
+        '  |-ViewGroup\n' // Platform View
+        '    |-ViewGroup\n'
+      );
+    }, timeout: Timeout.none);
+  });
+
+  group('Flutter surface with hybrid composition', () {
+    setUpAll(() async {
+      await driver.tap(find.byValueKey('NestedViewEventTile'));
+      await driver.tap(find.byValueKey('ToggleHybridComposition'));
+      await driver.tap(find.byValueKey('TogglePlatformView'));
+      await driver.tap(find.byValueKey('TogglePlatformView'));
     });
 
     tearDownAll(() async {
@@ -107,6 +155,6 @@ Future<void> main() async {
         '    |-ViewGroup\n'
         '  |-FlutterImageView\n' // Flutter UI (overlay surface)
       );
-    });
+    }, timeout: Timeout.none);
   });
 }

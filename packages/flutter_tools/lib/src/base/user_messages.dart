@@ -16,14 +16,28 @@ class UserMessages {
   // Messages used in FlutterValidator
   String flutterStatusInfo(String? channel, String? version, String os, String locale) =>
       'Channel ${channel ?? 'unknown'}, ${version ?? 'Unknown'}, on $os, locale $locale';
-  String flutterVersion(String version, String flutterRoot) =>
-      'Flutter version $version at $flutterRoot';
+  String flutterVersion(String version, String channel, String flutterRoot) =>
+      'Flutter version $version on channel $channel at $flutterRoot';
+  String get flutterUnknownChannel =>
+    'Currently on an unknown channel. Run `flutter channel` to switch to an official channel.\n'
+    "If that doesn't fix the issue, reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.";
+  String get flutterUnknownVersion =>
+    'Cannot resolve current version, possibly due to local changes.\n'
+    'Reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.';
   String flutterRevision(String revision, String age, String date) =>
-      'Framework revision $revision ($age), $date';
+    'Framework revision $revision ($age), $date';
   String flutterUpstreamRepositoryUrl(String url) => 'Upstream repository $url';
+  String get flutterUpstreamRepositoryUnknown =>
+    'Unknown upstream repository.\n'
+    'Reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.';
+  String flutterUpstreamRepositoryUrlEnvMismatch(String url) => 'Upstream repository $url is not the same as FLUTTER_GIT_URL';
+  String flutterUpstreamRepositoryUrlNonStandard(String url) =>
+    'Upstream repository $url is not a standard remote.\n'
+    'Set environment variable "FLUTTER_GIT_URL" to $url to dismiss this error.';
   String flutterGitUrl(String url) => 'FLUTTER_GIT_URL = $url';
   String engineRevision(String revision) => 'Engine revision $revision';
   String dartRevision(String revision) => 'Dart version $revision';
+  String devToolsVersion(String version) => 'DevTools version $version';
   String pubMirrorURL(String url) => 'Pub download mirror $url';
   String flutterMirrorURL(String url) => 'Flutter download mirror $url';
   String get flutterBinariesDoNotRun =>
@@ -33,6 +47,9 @@ class UserMessages {
       'On Debian/Ubuntu/Mint: sudo apt-get install lib32stdc++6\n'
       'On Fedora: dnf install libstdc++.i686\n'
       'On Arch: pacman -S lib32-gcc-libs';
+  String get flutterValidatorErrorIntentional =>
+      'If those were intentional, you can disregard the above warnings; however it is '
+      'recommended to use "git" directly to perform update checks and upgrades.';
 
   // Messages used in NoIdeValidator
   String get noIdeStatusInfo => 'No supported IDEs installed';
@@ -98,8 +115,8 @@ class UserMessages {
       'You can download the JDK from https://www.oracle.com/technetwork/java/javase/downloads/.';
   String androidJdkLocation(String location) => 'Java binary at: $location';
   String get androidLicensesAll => 'All Android licenses accepted.';
-  String get androidLicensesSome => 'Some Android licenses not accepted.  To resolve this, run: flutter doctor --android-licenses';
-  String get androidLicensesNone => 'Android licenses not accepted.  To resolve this, run: flutter doctor --android-licenses';
+  String get androidLicensesSome => 'Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses';
+  String get androidLicensesNone => 'Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses';
   String androidLicensesUnknown(Platform platform) =>
       'Android license status unknown.\n'
       'Run `flutter doctor --android-licenses` to accept the SDK licenses.\n'
@@ -117,7 +134,7 @@ class UserMessages {
       'Android sdkmanager tool was found, but failed to run ($sdkManagerPath): "$error".\n'
       'Try re-installing or updating your Android SDK,\n'
       'visit ${_androidSdkInstallUrl(platform)} for detailed instructions.';
-  String androidSdkBuildToolsOutdated(String managerPath, int sdkMinVersion, String buildToolsMinVersion, Platform platform) =>
+  String androidSdkBuildToolsOutdated(int sdkMinVersion, String buildToolsMinVersion, Platform platform) =>
       'Flutter requires Android SDK $sdkMinVersion and the Android BuildTools $buildToolsMinVersion\n'
       'To update the Android SDK visit ${_androidSdkInstallUrl(platform)} for detailed instructions.';
   String get androidMissingCmdTools => 'cmdline-tools component is missing\n'
@@ -145,9 +162,14 @@ class UserMessages {
   // Messages used in XcodeValidator
   String xcodeLocation(String location) => 'Xcode at $location';
 
-  String xcodeOutdated(String currentVersion, String recommendedVersion) =>
-      'Xcode $currentVersion out of date ($recommendedVersion is recommended).\n'
+  String xcodeOutdated(String requiredVersion) =>
+      'Flutter requires Xcode $requiredVersion or higher.\n'
       'Download the latest version or update via the Mac App Store.';
+
+  String xcodeRecommended(String recommendedVersion) =>
+      'Flutter recommends a minimum Xcode version of $recommendedVersion.\n'
+      'Download the latest version or update via the Mac App Store.';
+
   String get xcodeEula => "Xcode end user license agreement not signed; open Xcode or run the command 'sudo xcodebuild -license'.";
   String get xcodeMissingSimct =>
       'Xcode requires additional components to be installed in order to run.\n'
@@ -241,8 +263,8 @@ class UserMessages {
   String get flutterNoDevelopmentDevice =>
       "Unable to locate a development device; please run 'flutter doctor' "
       'for information about installing additional components.';
-  String flutterNoMatchingDevice(String deviceId) => 'No devices found with name or id '
-      "matching '$deviceId'";
+  String flutterNoMatchingDevice(String deviceId) => 'No supported devices found with name or id '
+      "matching '$deviceId'.";
   String get flutterNoDevicesFound => 'No devices found';
   String get flutterNoSupportedDevices => 'No supported devices connected.';
   String flutterMissPlatformProjects(List<String> unsupportedDevicesType) =>

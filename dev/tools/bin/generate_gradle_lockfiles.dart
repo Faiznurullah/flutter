@@ -24,8 +24,9 @@ void main(List<String> arguments) {
   for (final String androidDirectoryPath in androidDirectories) {
     final Directory androidDirectory = fileSystem.directory(path.normalize(androidDirectoryPath));
 
-    if (!androidDirectory.existsSync())
+    if (!androidDirectory.existsSync()) {
       throw '$androidDirectory does not exist';
+    }
 
     final File rootBuildGradle = androidDirectory.childFile('build.gradle');
     if (!rootBuildGradle.existsSync()) {
@@ -54,6 +55,11 @@ void main(List<String> arguments) {
       continue;
     }
 
+    if (androidDirectory.parent.childFile('pubspec.yaml').readAsStringSync().contains('deferred-components')) {
+      print('${rootBuildGradle.path} uses deferred components - skipping');
+      continue;
+    }
+
     if (!androidDirectory.parent
         .childDirectory('lib')
         .childFile('main.dart')
@@ -63,6 +69,12 @@ void main(List<String> arguments) {
     }
 
     print('Processing ${androidDirectory.path}');
+
+    try {
+      androidDirectory.childFile('buildscript-gradle.lockfile').deleteSync();
+    } on FileSystemException {
+      // noop
+    }
 
     rootBuildGradle.writeAsStringSync(rootGradleFileContent);
     settingsGradle.writeAsStringSync(settingGradleFile);
@@ -75,7 +87,7 @@ void main(List<String> arguments) {
     // Verify that the Gradlew wrapper exists.
     final File gradleWrapper = androidDirectory.childFile('gradlew');
     // Generate Gradle wrapper if it doesn't exists.
-    // This logic is embededed within the Flutter tool.
+    // This logic is embedded within the Flutter tool.
     // To generate the wrapper, build a flavor that doesn't exist.
     if (!gradleWrapper.existsSync()) {
       Process.runSync(
@@ -114,9 +126,10 @@ void exec(
   String? workingDirectory,
 }) {
   final ProcessResult result = Process.runSync(cmd, args, workingDirectory: workingDirectory);
-  if (result.exitCode != 0 || '${result.stderr}'.isNotEmpty)
+  if (result.exitCode != 0) {
     throw ProcessException(
         cmd, args, '${result.stdout}${result.stderr}', result.exitCode);
+  }
 }
 
 const String rootGradleFileContent = r'''
@@ -129,14 +142,14 @@ const String rootGradleFileContent = r'''
 // See dev/tools/bin/generate_gradle_lockfiles.dart.
 
 buildscript {
-    ext.kotlin_version = '1.4.32'
+    ext.kotlin_version = '1.7.10'
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.3'
+        classpath 'com.android.tools.build:gradle:7.2.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 
@@ -156,12 +169,15 @@ rootProject.buildDir = '../build'
 
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
     project.evaluationDependsOn(':app')
-
     dependencyLocking {
         ignoredDependencies.add('io.flutter:*')
         lockFile = file("${rootProject.projectDir}/project-${project.name}.lockfile")
-        lockAllConfigurations()
+        if (!project.hasProperty('local-engine-repo')) {
+          lockAllConfigurations()
+        }
     }
 }
 

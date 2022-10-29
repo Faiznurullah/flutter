@@ -35,12 +35,12 @@ void main() {
 
   testWidgets('BottomSheetThemeData implements debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
-    BottomSheetThemeData(
-      backgroundColor: const Color(0xFFFFFFFF),
+    const BottomSheetThemeData(
+      backgroundColor: Color(0xFFFFFFFF),
       elevation: 2.0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2.0)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(2.0))),
       clipBehavior: Clip.antiAlias,
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 640),
+      constraints: BoxConstraints(minWidth: 200, maxWidth: 640),
     ).debugFillProperties(builder);
 
     final List<String> description = builder.properties
@@ -51,7 +51,7 @@ void main() {
     expect(description, <String>[
       'backgroundColor: Color(0xffffffff)',
       'elevation: 2.0',
-      'shape: RoundedRectangleBorder(BorderSide(Color(0xff000000), 0.0, BorderStyle.none), BorderRadius.circular(2.0))',
+      'shape: RoundedRectangleBorder(BorderSide(width: 0.0, style: none), BorderRadius.circular(2.0))',
       'clipBehavior: Clip.antiAlias',
       'constraints: BoxConstraints(200.0<=w<=640.0, 0.0<=h<=Infinity)',
     ]);
@@ -148,12 +148,14 @@ void main() {
     const double modalElevation = 5.0;
     const double persistentElevation = 7.0;
     const Color modalBackgroundColor = Colors.yellow;
+    const Color modalBarrierColor = Colors.blue;
     const Color persistentBackgroundColor = Colors.red;
     const BottomSheetThemeData bottomSheetTheme = BottomSheetThemeData(
       elevation: persistentElevation,
       modalElevation: modalElevation,
       backgroundColor: persistentBackgroundColor,
       modalBackgroundColor: modalBackgroundColor,
+      modalBarrierColor:modalBarrierColor,
     );
 
     await tester.pumpWidget(bottomSheetWithElevations(bottomSheetTheme));
@@ -168,6 +170,9 @@ void main() {
     );
     expect(material.elevation, modalElevation);
     expect(material.color, modalBackgroundColor);
+
+    final ModalBarrier modalBarrier = tester.widget(find.byType(ModalBarrier).last);
+    expect(modalBarrier.color, modalBarrierColor);
   });
 
   testWidgets('General bottom sheet parameters take priority over modal bottom sheet-specific parameters for persistent bottom sheets', (WidgetTester tester) async {
@@ -272,7 +277,7 @@ void main() {
     expect(lightMaterial.color, lightBackgroundColor);
 
     // Simulate the user changing to dark theme
-    tester.binding.window.platformBrightnessTestValue = Brightness.dark;
+    tester.binding.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     await tester.pumpAndSettle();
 
     final Material darkMaterial = tester.widget<Material>(
@@ -329,10 +334,10 @@ Widget bottomSheetWithElevations(BottomSheetThemeData bottomSheetTheme) {
 }
 
 BottomSheetThemeData _bottomSheetTheme() {
-  return BottomSheetThemeData(
+  return const BottomSheetThemeData(
     backgroundColor: Colors.orange,
     elevation: 12.0,
-    shape: BeveledRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    shape: BeveledRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
     clipBehavior: Clip.antiAlias,
   );
 }

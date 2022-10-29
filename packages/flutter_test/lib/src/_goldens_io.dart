@@ -5,13 +5,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
-// ignore: deprecated_member_use
-import 'package:test_api/test_api.dart' as test_package show TestFailure;
+import 'package:test_api/expect.dart' show fail;
 
 import 'goldens.dart';
 import 'test_async_utils.dart';
@@ -49,6 +47,8 @@ import 'test_async_utils.dart';
 /// |  testName_testImage.png    | ![Test image](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_testImage.png)  |
 /// |  testName_isolatedDiff.png | ![An isolated pixel difference.](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_isolatedDiff.png) |
 /// |  testName_maskedDiff.png   | ![A masked pixel difference](https://flutter.github.io/assets-for-api-docs/assets/flutter-test/goldens/widget_maskedDiff.png) |
+///
+/// {@macro flutter.flutter_test.matchesGoldenFile.custom_fonts}
 ///
 /// See also:
 ///
@@ -117,7 +117,7 @@ class LocalFileComparator extends GoldenFileComparator with LocalComparisonOutpu
   Future<List<int>> getGoldenBytes(Uri golden) async {
     final File goldenFile = _getGoldenFile(golden);
     if (!goldenFile.existsSync()) {
-      throw test_package.TestFailure(
+      fail(
         'Could not be compared against non-existent file: "$golden"'
       );
     }
@@ -143,10 +143,10 @@ mixin LocalComparisonOutput {
     String additionalFeedback = '';
     if (result.diffs != null) {
       additionalFeedback = '\nFailure feedback can be found at ${path.join(basedir.path, 'failures')}';
-      final Map<String, Image> diffs = result.diffs!.cast<String, Image>();
+      final Map<String, Image> diffs = result.diffs!;
       for (final MapEntry<String, Image> entry in diffs.entries) {
         final File output = getFailureFile(
-          key.isEmpty ? entry.key : entry.key + '_' + key,
+          key.isEmpty ? entry.key : '${entry.key}_$key',
           golden,
           basedir,
         );
@@ -161,10 +161,7 @@ mixin LocalComparisonOutput {
   /// Returns the appropriate file for a given diff from a [ComparisonResult].
   File getFailureFile(String failure, Uri golden, Uri basedir) {
     final String fileName = golden.pathSegments.last;
-    final String testName = fileName.split(path.extension(fileName))[0]
-      + '_'
-      + failure
-      + '.png';
+    final String testName = '${fileName.split(path.extension(fileName))[0]}_$failure.png';
     return File(path.join(
       path.fromUri(basedir),
       path.fromUri(Uri.parse('failures/$testName')),
@@ -175,11 +172,12 @@ mixin LocalComparisonOutput {
 /// Returns a [ComparisonResult] to describe the pixel differential of the
 /// [test] and [master] image bytes provided.
 Future<ComparisonResult> compareLists(List<int>? test, List<int>? master) async {
-  if (identical(test, master))
+  if (identical(test, master)) {
     return ComparisonResult(
       passed: true,
       diffPercent: 0.0,
     );
+  }
 
   if (test == null || master == null || test.isEmpty || master.isEmpty) {
     return ComparisonResult(

@@ -68,11 +68,11 @@ void main() {
     expect(io.ProcessSignal.sigint.toString(), ProcessSignal.sigint.toString());
   });
 
-  testWithoutContext('exit throws a StateError if called without being overriden', () {
+  testWithoutContext('exit throws a StateError if called without being overridden', () {
     expect(() => exit(0), throwsAssertionError);
   });
 
-  testWithoutContext('exit does not throw a StateError if overriden', () {
+  testWithoutContext('exit does not throw a StateError if overridden', () {
     try {
       setExitFunctionForTests((int value) {});
 
@@ -102,7 +102,7 @@ void main() {
 
   testWithoutContext('Does not listen to Posix process signals on windows', () async {
     final FakePlatform windows = FakePlatform(operatingSystem: 'windows');
-    final FakePlatform linux = FakePlatform(operatingSystem: 'linux');
+    final FakePlatform linux = FakePlatform();
     final FakeProcessSignal fakeSignalA = FakeProcessSignal();
     final FakeProcessSignal fakeSignalB = FakeProcessSignal();
     fakeSignalA.controller.add(fakeSignalA);

@@ -41,25 +41,8 @@ const PointerDownEvent down3 = PointerDownEvent(
   buttons: kSecondaryButton,
 );
 
-const PointerUpEvent up3 = PointerUpEvent(
-  pointer: 7,
-  position: Offset(31, 29),
-);
-
-// Down/up pair 4: tap sequence with tertiary button
-const PointerDownEvent down4 = PointerDownEvent(
-  pointer: 8,
-  position: Offset(42, 24),
-  buttons: kTertiaryButton,
-);
-
-const PointerUpEvent up4 = PointerUpEvent(
-  pointer: 8,
-  position: Offset(43, 23),
-);
-
 void main() {
-  setUp(ensureGestureBinding);
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Long press', () {
     late LongPressGestureRecognizer gesture;
@@ -300,6 +283,7 @@ void main() {
         position: Offset(15, 15),
       ));
       expect(recognized, const <String>['down', 'start', 'move']);
+      gesture.dispose();
     });
   });
 
@@ -526,7 +510,6 @@ void main() {
     const PointerDownEvent touchDown = PointerDownEvent(
       pointer: 5,
       position: Offset(10, 10),
-      kind: PointerDeviceKind.touch,
     );
 
     // Touch events shouldn't be recognized.

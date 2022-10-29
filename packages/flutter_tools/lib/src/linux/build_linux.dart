@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import '../artifacts.dart';
 import '../base/analyze_size.dart';
 import '../base/common.dart';
@@ -14,11 +12,11 @@ import '../base/utils.dart';
 import '../build_info.dart';
 import '../cache.dart';
 import '../cmake.dart';
+import '../cmake_project.dart';
 import '../convert.dart';
 import '../flutter_plugins.dart';
-import '../globals_null_migrated.dart' as globals;
+import '../globals.dart' as globals;
 import '../migrations/cmake_custom_command_migration.dart';
-import '../project.dart';
 
 // Matches the following error and warning patterns:
 // - <file path>:<line>:<column>: (fatal) error: <error...>
@@ -31,15 +29,16 @@ final RegExp errorMatcher = RegExp(r'(?:(?:.*:\d+:\d+|clang):\s)?(fatal\s)?(?:er
 Future<void> buildLinux(
   LinuxProject linuxProject,
   BuildInfo buildInfo, {
-    String target = 'lib/main.dart',
-    SizeAnalyzer sizeAnalyzer,
+    String? target,
+    SizeAnalyzer? sizeAnalyzer,
     bool needCrossBuild = false,
-    TargetPlatform targetPlatform = TargetPlatform.linux_x64,
+    required TargetPlatform targetPlatform,
     String targetSysroot = '/',
   }) async {
+  target ??= 'lib/main.dart';
   if (!linuxProject.cmakeFile.existsSync()) {
     throwToolExit('No Linux desktop project configured. See '
-      'https://flutter.dev/desktop#add-desktop-support-to-an-existing-flutter-app '
+      'https://docs.flutter.dev/desktop#add-desktop-support-to-an-existing-flutter-app '
       'to learn about adding Linux support to a project.');
   }
 
@@ -48,21 +47,20 @@ Future<void> buildLinux(
   ];
 
   final ProjectMigration migration = ProjectMigration(migrators);
-  if (!migration.run()) {
-    throwToolExit('Unable to migrate project files');
-  }
+  migration.run();
 
   // Build the environment that needs to be set for the re-entrant flutter build
   // step.
   final Map<String, String> environmentConfig = buildInfo.toEnvironmentConfig();
   environmentConfig['FLUTTER_TARGET'] = target;
-  if (globals.artifacts is LocalEngineArtifacts) {
-    final LocalEngineArtifacts localEngineArtifacts = globals.artifacts as LocalEngineArtifacts;
+  final Artifacts? artifacts = globals.artifacts;
+  if (artifacts is LocalEngineArtifacts) {
+    final LocalEngineArtifacts localEngineArtifacts = artifacts;
     final String engineOutPath = localEngineArtifacts.engineOutPath;
     environmentConfig['FLUTTER_ENGINE'] = globals.fs.path.dirname(globals.fs.path.dirname(engineOutPath));
-    environmentConfig['LOCAL_ENGINE'] = globals.fs.path.basename(engineOutPath);
+    environmentConfig['LOCAL_ENGINE'] = localEngineArtifacts.localEngineName;
   }
-  writeGeneratedCmakeConfig(Cache.flutterRoot, linuxProject, environmentConfig);
+  writeGeneratedCmakeConfig(Cache.flutterRoot!, linuxProject, buildInfo, environmentConfig);
 
   createPluginSymlinks(linuxProject.parent);
 
@@ -70,7 +68,7 @@ Future<void> buildLinux(
     'Building Linux application...',
   );
   try {
-    final String buildModeName = getNameForBuildMode(buildInfo.mode ?? BuildMode.release);
+    final String buildModeName = getNameForBuildMode(buildInfo.mode);
     final Directory buildDirectory =
         globals.fs.directory(getLinuxBuildDirectory(targetPlatform)).childDirectory(buildModeName);
     await _runCmake(buildModeName, linuxProject.cmakeFile.parent, buildDirectory,
@@ -85,7 +83,7 @@ Future<void> buildLinux(
       .childFile('snapshot.$arch.json');
     final File precompilerTrace = globals.fs.directory(buildInfo.codeSizeDirectory)
       .childFile('trace.$arch.json');
-    final Map<String, Object> output = await sizeAnalyzer.analyzeAotSnapshot(
+    final Map<String, Object?> output = await sizeAnalyzer.analyzeAotSnapshot(
       aotSnapshot: codeSizeFile,
       // This analysis is only supported for release builds.
       outputDirectory: globals.fs.directory(
@@ -120,38 +118,37 @@ Future<void> _runCmake(String buildModeName, Directory sourceDir, Directory buil
 
   await buildDir.create(recursive: true);
 
-  final String buildFlag = toTitleCase(buildModeName);
+  final String buildFlag = sentenceCase(buildModeName);
   final bool needCrossBuildOptionsForArm64 = needCrossBuild
       && targetPlatform == TargetPlatform.linux_arm64;
   int result;
-  try {
-    result = await globals.processUtils.stream(
-      <String>[
-        'cmake',
-        '-G',
-        'Ninja',
-        '-DCMAKE_BUILD_TYPE=$buildFlag',
-        '-DFLUTTER_TARGET_PLATFORM=' + getNameForTargetPlatform(targetPlatform),
-        // Support cross-building for arm64 targets on x64 hosts.
-        // (Cross-building for x64 on arm64 hosts isn't supported now.)
-        if (needCrossBuild)
-          '-DFLUTTER_TARGET_PLATFORM_SYSROOT=$targetSysroot',
-        if (needCrossBuildOptionsForArm64)
-          '-DCMAKE_C_COMPILER_TARGET=aarch64-linux-gnu',
-        if (needCrossBuildOptionsForArm64)
-          '-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-gnu',
-        sourceDir.path,
-      ],
-      workingDirectory: buildDir.path,
-      environment: <String, String>{
-        'CC': 'clang',
-        'CXX': 'clang++'
-      },
-      trace: true,
-    );
-  } on ArgumentError {
-    throwToolExit("cmake not found. Run 'flutter doctor' for more information.");
+  if (!globals.processManager.canRun('cmake')) {
+    throwToolExit(globals.userMessages.cmakeMissing);
   }
+  result = await globals.processUtils.stream(
+    <String>[
+      'cmake',
+      '-G',
+      'Ninja',
+      '-DCMAKE_BUILD_TYPE=$buildFlag',
+      '-DFLUTTER_TARGET_PLATFORM=${getNameForTargetPlatform(targetPlatform)}',
+      // Support cross-building for arm64 targets on x64 hosts.
+      // (Cross-building for x64 on arm64 hosts isn't supported now.)
+      if (needCrossBuild)
+        '-DFLUTTER_TARGET_PLATFORM_SYSROOT=$targetSysroot',
+      if (needCrossBuildOptionsForArm64)
+        '-DCMAKE_C_COMPILER_TARGET=aarch64-linux-gnu',
+      if (needCrossBuildOptionsForArm64)
+        '-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-gnu',
+      sourceDir.path,
+    ],
+    workingDirectory: buildDir.path,
+    environment: <String, String>{
+      'CC': 'clang',
+      'CXX': 'clang++',
+    },
+    trace: true,
+  );
   if (result != 0) {
     throwToolExit('Unable to generate build files');
   }

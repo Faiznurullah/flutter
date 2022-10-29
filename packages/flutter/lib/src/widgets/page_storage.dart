@@ -6,6 +6,9 @@ import 'package:flutter/foundation.dart';
 
 import 'framework.dart';
 
+// Examples can assume:
+// late BuildContext context;
+
 /// A key can be used to persist the widget state in storage after
 /// the destruction and will be restored when recreated.
 ///
@@ -19,7 +22,7 @@ import 'framework.dart';
 ///  * [PageStorage], which is the closet ancestor for [PageStorageKey].
 class PageStorageKey<T> extends ValueKey<T> {
   /// Creates a [ValueKey] that defines where [PageStorage] values will be saved.
-  const PageStorageKey(T value) : super(value);
+  const PageStorageKey(super.value);
 }
 
 @immutable
@@ -33,14 +36,15 @@ class _StorageEntryIdentifier {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is _StorageEntryIdentifier
         && listEquals<PageStorageKey<dynamic>>(other.keys, keys);
   }
 
   @override
-  int get hashCode => hashList(keys);
+  int get hashCode => Object.hashAll(keys);
 
   @override
   String toString() {
@@ -56,8 +60,9 @@ class PageStorageBucket {
   static bool _maybeAddKey(BuildContext context, List<PageStorageKey<dynamic>> keys) {
     final Widget widget = context.widget;
     final Key? key = widget.key;
-    if (key is PageStorageKey)
+    if (key is PageStorageKey) {
       keys.add(key);
+    }
     return widget is! PageStorage;
   }
 
@@ -91,8 +96,9 @@ class PageStorageBucket {
       _storage![identifier] = data;
     } else {
       final _StorageEntryIdentifier contextIdentifier = _computeIdentifier(context);
-      if (contextIdentifier.isNotEmpty)
+      if (contextIdentifier.isNotEmpty) {
         _storage![contextIdentifier] = data;
+      }
     }
   }
 
@@ -105,10 +111,12 @@ class PageStorageBucket {
   /// If an explicit identifier is not provided and no [PageStorageKey]s
   /// are found, then null is returned.
   dynamic readState(BuildContext context, { Object? identifier }) {
-    if (_storage == null)
+    if (_storage == null) {
       return null;
-    if (identifier != null)
+    }
+    if (identifier != null) {
       return _storage![identifier];
+    }
     final _StorageEntryIdentifier contextIdentifier = _computeIdentifier(context);
     return contextIdentifier.isNotEmpty ? _storage![contextIdentifier] : null;
   }
@@ -136,104 +144,13 @@ class PageStorageBucket {
 /// you should give each of them unique [PageStorageKey]s, or set some of their
 /// `keepScrollOffset` false to prevent saving.
 ///
-/// {@tool dartpad --template=freeform}
-///
+/// {@tool dartpad}
 /// This sample shows how to explicitly use a [PageStorage] to
 /// store the states of its children pages. Each page includes a scrollable
 /// list, whose position is preserved when switching between the tabs thanks to
 /// the help of [PageStorageKey].
 ///
-/// ```dart imports
-/// import 'package:flutter/material.dart';
-/// ```
-///
-/// ```dart main
-/// void main() => runApp(const MyApp());
-/// ```
-///
-/// ```dart
-/// class MyApp extends StatelessWidget {
-///   const MyApp({Key? key}) : super(key: key);
-///
-///   @override
-///   Widget build(BuildContext context) {
-///     return const MaterialApp(
-///       home: MyHomePage(),
-///     );
-///   }
-/// }
-///
-/// class MyHomePage extends StatefulWidget {
-///   const MyHomePage({Key? key}) : super(key: key);
-///
-///   @override
-///   State<MyHomePage> createState() => _MyHomePageState();
-/// }
-///
-/// class _MyHomePageState extends State<MyHomePage> {
-///   final List<Widget> pages = const <Widget>[
-///     ColorBoxPage(
-///       key: PageStorageKey<String>('pageOne'),
-///     ),
-///     ColorBoxPage(
-///       key: PageStorageKey<String>('pageTwo'),
-///     )
-///   ];
-///   int currentTab = 0;
-///   final PageStorageBucket _bucket = PageStorageBucket();
-///
-///   @override
-///   Widget build(BuildContext context) {
-///     return Scaffold(
-///       appBar: AppBar(
-///         title: const Text('Persistence Example'),
-///       ),
-///       body: PageStorage(
-///         child: pages[currentTab],
-///         bucket: _bucket,
-///       ),
-///       bottomNavigationBar: BottomNavigationBar(
-///         currentIndex: currentTab,
-///         onTap: (int index) {
-///           setState(() {
-///             currentTab = index;
-///           });
-///         },
-///         items: const <BottomNavigationBarItem>[
-///           BottomNavigationBarItem(
-///             icon: Icon(Icons.home),
-///             label: 'page 1',
-///           ),
-///           BottomNavigationBarItem(
-///             icon: Icon(Icons.settings),
-///             label: 'page2',
-///           ),
-///         ],
-///       ),
-///     );
-///   }
-/// }
-///
-/// class ColorBoxPage extends StatelessWidget {
-///   const ColorBoxPage({Key? key}) : super(key: key);
-///
-///   @override
-///   Widget build(BuildContext context) {
-///     return ListView.builder(
-///       itemExtent: 250.0,
-///       itemBuilder: (BuildContext context, int index) => Container(
-///         padding: const EdgeInsets.all(10.0),
-///         child: Material(
-///           color: index.isEven ? Colors.cyan : Colors.deepOrange,
-///           child: Center(
-///             child: Text(index.toString()),
-///           ),
-///         ),
-///       ),
-///     );
-///   }
-/// }
-/// ```
+/// ** See code in examples/api/lib/widgets/page_storage/page_storage.0.dart **
 /// {@end-tool}
 ///
 /// See also:
@@ -244,11 +161,10 @@ class PageStorage extends StatelessWidget {
   ///
   /// The [bucket] argument must not be null.
   const PageStorage({
-    Key? key,
+    super.key,
     required this.bucket,
     required this.child,
-  }) : assert(bucket != null),
-       super(key: key);
+  }) : assert(bucket != null);
 
   /// The widget below this widget in the tree.
   ///
@@ -265,7 +181,7 @@ class PageStorage extends StatelessWidget {
   /// Typical usage is as follows:
   ///
   /// ```dart
-  /// PageStorageBucket bucket = PageStorage.of(context);
+  /// PageStorageBucket bucket = PageStorage.of(context)!;
   /// ```
   ///
   /// This method can be expensive (it walks the element tree).

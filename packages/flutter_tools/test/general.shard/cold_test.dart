@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/io.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/build_info.dart';
+import 'package:flutter_tools/src/build_system/targets/shader_compiler.dart';
 import 'package:flutter_tools/src/compile.dart';
+import 'package:flutter_tools/src/devfs.dart';
 import 'package:flutter_tools/src/device.dart';
 import 'package:flutter_tools/src/resident_runner.dart';
 import 'package:flutter_tools/src/run_cold.dart';
 import 'package:flutter_tools/src/tracing.dart';
 import 'package:flutter_tools/src/vmservice.dart';
-import 'package:meta/meta.dart';
 import 'package:test/fake.dart';
 import 'package:vm_service/vm_service.dart';
 
@@ -42,9 +41,7 @@ void main() {
     final int exitCode = await ColdRunner(devices,
       debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
       target: 'main.dart',
-    ).attach(
-      enableDevTools: false,
-    );
+    ).attach();
     expect(exitCode, 2);
   });
 
@@ -70,8 +67,9 @@ void main() {
   });
 
   group('cold run', () {
-    MemoryFileSystem memoryFileSystem;
-    FakePlatform fakePlatform;
+    late MemoryFileSystem memoryFileSystem;
+    late FakePlatform fakePlatform;
+
     setUp(() {
       memoryFileSystem = MemoryFileSystem();
       fakePlatform = FakePlatform(environment: <String, String>{});
@@ -88,9 +86,7 @@ void main() {
         applicationBinary: applicationBinary,
         debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
         target: 'main.dart',
-      ).run(
-        enableDevTools: false,
-      );
+      ).run();
 
       expect(result, 1);
     });
@@ -106,9 +102,7 @@ void main() {
         debuggingOptions: DebuggingOptions.disabled(BuildInfo.debug),
         target: 'main.dart',
         traceStartup: true,
-      ).run(
-        enableDevTools: false,
-      );
+      ).run();
 
       expect(result, 0);
       expect(memoryFileSystem.directory(getBuildDirectory()).childFile('start_up_info.json').existsSync(), true);
@@ -131,9 +125,7 @@ void main() {
         debuggingOptions: DebuggingOptions.disabled(BuildInfo.debug),
         target: 'main.dart',
         traceStartup: true,
-      ).run(
-        enableDevTools: false,
-      );
+      ).run();
 
       expect(result, 0);
       expect(memoryFileSystem.directory('test_output_dir').childFile('start_up_info.json').existsSync(), true);
@@ -167,7 +159,7 @@ class FakeFlutterDevice extends Fake implements FlutterDevice {
   int runColdCode = 0;
 
   @override
-  Future<int> runCold({ColdRunner coldRunner, String route}) async {
+  Future<int> runCold({ColdRunner? coldRunner, String? route}) async {
     return runColdCode;
   }
 
@@ -175,15 +167,18 @@ class FakeFlutterDevice extends Fake implements FlutterDevice {
   Future<void> initLogReader() async { }
 }
 
+// Unfortunately Device, despite not being immutable, has an `operator ==`.
+// Until we fix that, we have to also ignore related lints here.
+// ignore: avoid_implementing_value_types
 class FakeDevice extends Fake implements Device {
   @override
   bool isSupported() => true;
 
   @override
-  bool supportsHotReload;
+  bool supportsHotReload = false;
 
   @override
-  bool supportsHotRestart;
+  bool supportsHotRestart = false;
 
   @override
   Future<String> get sdkNameAndVersion async => 'Android 10';
@@ -204,34 +199,35 @@ class FakeDevice extends Fake implements Device {
 
 class TestFlutterDevice extends FlutterDevice {
   TestFlutterDevice({
-    @required Device device,
-    @required this.exception,
-    @required ResidentCompiler generator,
+    required Device device,
+    required this.exception,
+    required ResidentCompiler generator,
   })  : assert(exception != null),
-        super(device, buildInfo: BuildInfo.debug, generator: generator);
+        super(device, buildInfo: BuildInfo.debug, generator: generator, developmentShaderCompiler: const FakeShaderCompiler());
 
   /// The exception to throw when the connect method is called.
   final Exception exception;
 
   @override
   Future<void> connect({
-    ReloadSources reloadSources,
-    Restart restart,
-    CompileExpression compileExpression,
-    GetSkSLMethod getSkSLMethod,
-    PrintStructuredErrorLogMethod printStructuredErrorLogMethod,
+    ReloadSources? reloadSources,
+    Restart? restart,
+    CompileExpression? compileExpression,
+    GetSkSLMethod? getSkSLMethod,
+    PrintStructuredErrorLogMethod? printStructuredErrorLogMethod,
     bool enableDds = true,
+    bool cacheStartupProfile = false,
     bool disableServiceAuthCodes = false,
-    int hostVmServicePort,
-    int ddsPort,
-    bool ipv6 = false,
+    int? hostVmServicePort,
+    int? ddsPort,
+    bool? ipv6 = false,
     bool allowExistingDdsInstance = false,
   }) async {
     throw exception;
   }
 }
 
-class FakeResidentCompiler extends Fake implements ResidentCompiler {}
+class FakeResidentCompiler extends Fake implements ResidentCompiler { }
 
 class FakeFlutterVmService extends Fake implements FlutterVmService {
   @override
@@ -243,10 +239,10 @@ class FakeFlutterVmService extends Fake implements FlutterVmService {
   }
 
   @override
-  Future<bool> flutterAlreadyPaintedFirstUsefulFrame({String isolateId}) async => true;
+  Future<bool> flutterAlreadyPaintedFirstUsefulFrame({String? isolateId}) async => true;
 
   @override
-  Future<Response> getTimeline() async {
+  Future<Response?> getTimeline() async {
     return Response.parse(<String, dynamic>{
       'traceEvents': <dynamic>[
         <String, dynamic>{
@@ -278,5 +274,17 @@ class FakeVmService extends Fake implements VmService {
     return Stream<Event>.fromIterable(<Event>[
       Event(kind: 'Extension', extensionKind: 'Flutter.FirstFrame', timestamp: 1),
     ]);
+  }
+}
+
+class FakeShaderCompiler implements DevelopmentShaderCompiler {
+  const FakeShaderCompiler();
+
+  @override
+  void configureCompiler(TargetPlatform? platform, { required bool enableImpeller }) { }
+
+  @override
+  Future<DevFSContent> recompileShader(DevFSContent inputShader) {
+    throw UnimplementedError();
   }
 }

@@ -6,17 +6,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_devicelab/common.dart';
-import 'package:flutter_devicelab/framework/adb.dart';
+import 'package:flutter_devicelab/framework/devices.dart';
 import 'package:flutter_devicelab/framework/framework.dart';
-import 'package:flutter_devicelab/framework/host_agent.dart';
 import 'package:flutter_devicelab/framework/task_result.dart';
 import 'package:flutter_devicelab/framework/utils.dart';
 import 'package:path/path.dart' as path;
 
 void main() {
   task(() async {
-    int vmServicePort;
+    int? vmServicePort;
 
     final Device device = await devices.workingDevice;
     await device.unlock();
@@ -29,19 +27,16 @@ void main() {
           '--verbose',
           '-d',
           device.deviceId,
-          '--screenshot',
-          hostAgent.dumpDirectory.path,
           '--route',
           '/smuggle-it',
           'lib/route.dart',
         ],
-        canFail: false,
       );
     });
     section('TEST WHETHER `flutter run --route` WORKS');
     await inDirectory(appDir, () async {
       final Completer<void> ready = Completer<void>();
-      bool ok;
+      late bool ok;
       print('run: starting...');
       final Process run = await startProcess(
         path.join(flutterDirectory.path, 'bin', 'flutter'),
@@ -59,7 +54,7 @@ void main() {
               print('service protocol connection available at port $vmServicePort');
               print('run: ready!');
               ready.complete();
-              ok ??= true;
+              ok = true;
             }
           }
         });
@@ -71,8 +66,9 @@ void main() {
         });
       unawaited(run.exitCode.then<void>((int exitCode) { ok = false; }));
       await Future.any<dynamic>(<Future<dynamic>>[ ready.future, run.exitCode ]);
-      if (!ok)
+      if (!ok) {
         throw 'Failed to run test app.';
+      }
       print('drive: starting...');
       final Process drive = await startProcess(
         path.join(flutterDirectory.path, 'bin', 'flutter'),
@@ -95,11 +91,13 @@ void main() {
       await flutter('install', options: <String>[
         '--uninstall-only',
       ]);
-      if (result != 0)
+      if (result != 0) {
         throw 'Failed to drive test app (exit code $result).';
+      }
       result = await run.exitCode;
-      if (result != 0)
+      if (result != 0) {
         throw 'Received unexpected exit code $result from run process.';
+      }
     });
     return TaskResult.success(null);
   });

@@ -2,50 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:file/file.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/logger.dart';
-import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/base/project_migrator.dart';
 import 'package:flutter_tools/src/base/terminal.dart';
+import 'package:flutter_tools/src/cmake_project.dart';
 import 'package:flutter_tools/src/migrations/cmake_custom_command_migration.dart';
-import 'package:flutter_tools/src/project.dart';
-import 'package:meta/meta.dart';
 import 'package:test/fake.dart';
 
 import '../../src/common.dart';
 
 void main () {
   group('CMake project migration', () {
-    testWithoutContext('migrators succeed', () {
-      final FakeCmakeMigrator fakeCmakeMigrator = FakeCmakeMigrator(succeeds: true);
-      final ProjectMigration migration = ProjectMigration(<ProjectMigrator>[fakeCmakeMigrator]);
-      expect(migration.run(), isTrue);
-    });
-
-    testWithoutContext('migrators fail', () {
-      final FakeCmakeMigrator fakeCmakeMigrator = FakeCmakeMigrator(succeeds: false);
-      final ProjectMigration migration = ProjectMigration(<ProjectMigrator>[fakeCmakeMigrator]);
-      expect(migration.run(), isFalse);
-    });
-
     group('migrate add_custom_command() to use VERBATIM', () {
-      MemoryFileSystem memoryFileSystem;
-      BufferLogger testLogger;
-      FakeCmakeProject mockCmakeProject;
-      File managedCmakeFile;
+      late MemoryFileSystem memoryFileSystem;
+      late BufferLogger testLogger;
+      late FakeCmakeProject mockCmakeProject;
+      late File managedCmakeFile;
 
       setUp(() {
         memoryFileSystem = MemoryFileSystem.test();
         managedCmakeFile = memoryFileSystem.file('CMakeLists.txtx');
 
         testLogger = BufferLogger(
-          terminal: AnsiTerminal(
-            stdio: null,
-            platform: const LocalPlatform(),
-          ),
+          terminal: Terminal.test(),
           outputPreferences: OutputPreferences.test(),
         );
 
@@ -57,7 +38,7 @@ void main () {
           mockCmakeProject,
           testLogger,
         );
-        expect(cmakeProjectMigration.migrate(), isTrue);
+        cmakeProjectMigration.migrate();
         expect(managedCmakeFile.existsSync(), isFalse);
 
         expect(testLogger.traceText, contains('CMake project not found, skipping add_custom_command() VERBATIM migration'));
@@ -73,7 +54,7 @@ void main () {
           mockCmakeProject,
           testLogger,
         );
-        expect(cmakeProjectMigration.migrate(), isTrue);
+        cmakeProjectMigration.migrate();
 
         expect(managedCmakeFile.lastModifiedSync(), projectLastModified);
         expect(managedCmakeFile.readAsStringSync(), contents);
@@ -100,7 +81,7 @@ add_custom_command(
           mockCmakeProject,
           testLogger,
         );
-        expect(cmakeProjectMigration.migrate(), isTrue);
+        cmakeProjectMigration.migrate();
 
         expect(managedCmakeFile.lastModifiedSync(), projectLastModified);
         expect(managedCmakeFile.readAsStringSync(), contents);
@@ -124,7 +105,7 @@ add_custom_command(
           mockCmakeProject,
           testLogger,
         );
-        expect(cmakeProjectMigration.migrate(), isTrue);
+        cmakeProjectMigration.migrate();
 
         expect(managedCmakeFile.readAsStringSync(), r'''
 add_custom_command(
@@ -158,7 +139,7 @@ add_custom_command(
           mockCmakeProject,
           testLogger,
         );
-        expect(cmakeProjectMigration.migrate(), isTrue);
+        cmakeProjectMigration.migrate();
 
         expect(managedCmakeFile.readAsStringSync(), r'''
 add_custom_command(
@@ -186,15 +167,11 @@ class FakeCmakeProject extends Fake implements CmakeBasedProject {
 }
 
 class FakeCmakeMigrator extends ProjectMigrator {
-  FakeCmakeMigrator({@required this.succeeds})
-    : super(null);
-
-  final bool succeeds;
+  FakeCmakeMigrator()
+    : super(BufferLogger.test());
 
   @override
-  bool migrate() {
-    return succeeds;
-  }
+  void migrate() { }
 
   @override
   String migrateLine(String line) {

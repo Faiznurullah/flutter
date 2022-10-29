@@ -8,14 +8,18 @@ import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/bot_detector.dart';
 import 'package:flutter_tools/src/base/common.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
+import 'package:flutter_tools/src/base/io.dart' show ProcessException;
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/cache.dart';
+import 'package:flutter_tools/src/convert.dart';
 import 'package:flutter_tools/src/dart/pub.dart';
+import 'package:flutter_tools/src/project.dart';
 import 'package:flutter_tools/src/reporting/reporting.dart';
 
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
+import '../../src/fakes.dart';
 
 void main() {
   setUpAll(() {
@@ -26,7 +30,7 @@ void main() {
     final FakeProcessManager processManager = FakeProcessManager.empty();
     final BufferLogger logger = BufferLogger.test();
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
-    processManager.excludedExecutables.add('bin/cache/dart-sdk/bin/pub');
+    processManager.excludedExecutables.add('bin/cache/dart-sdk/bin/dart');
 
     fileSystem.file('pubspec.yaml').createSync();
 
@@ -35,16 +39,202 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await expectLater(() => pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     ), throwsToolExit(message: 'Your Flutter SDK download may be corrupt or missing permissions to run'));
+  });
+
+  group('shouldSkipThirdPartyGenerator', () {
+    testWithoutContext('does not skip pub get the parameter is false', () async {
+      final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+        const FakeCommand(command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+        ]),
+      ]);
+      final BufferLogger logger = BufferLogger.test();
+      final MemoryFileSystem fileSystem = MemoryFileSystem.test();
+
+      fileSystem.file('pubspec.yaml').createSync();
+      fileSystem.file('pubspec.lock').createSync();
+      fileSystem.file('version').writeAsStringSync('b');
+      fileSystem.file('.dart_tool/package_config.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('''
+  {
+    "configVersion": 2,
+    "packages": [],
+    "generated": "2021-07-08T10:02:49.155589Z",
+    "generator": "third-party",
+    "generatorVersion": "2.14.0-276.0.dev"
+  }
+  ''');
+
+      final Pub pub = Pub(
+        fileSystem: fileSystem,
+        logger: logger,
+        processManager: processManager,
+        usage: TestUsage(),
+        platform: FakePlatform(),
+        botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+      );
+
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.pubGet,
+        checkUpToDate: true,
+        shouldSkipThirdPartyGenerator: false,
+      );
+
+      expect(processManager, hasNoRemainingExpectations);
+      expect(fileSystem.file('.dart_tool/version').readAsStringSync(), 'b');
+    });
+
+    testWithoutContext('does not skip pub get if package_config.json has "generator": "pub"', () async {
+      final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+        const FakeCommand(command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+        ]),
+      ]);
+      final BufferLogger logger = BufferLogger.test();
+      final MemoryFileSystem fileSystem = MemoryFileSystem.test();
+
+      fileSystem.file('pubspec.yaml').createSync();
+      fileSystem.file('pubspec.lock').createSync();
+      fileSystem.file('.dart_tool/package_config.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('''
+  {
+    "configVersion": 2,
+    "packages": [],
+    "generated": "2021-07-08T10:02:49.155589Z",
+    "generator": "pub",
+    "generatorVersion": "2.14.0-276.0.dev"
+  }
+  ''');
+      fileSystem.file('.dart_tool/version').writeAsStringSync('a');
+      fileSystem.file('version').writeAsStringSync('b');
+
+      final Pub pub = Pub(
+        fileSystem: fileSystem,
+        logger: logger,
+        processManager: processManager,
+        usage: TestUsage(),
+        platform: FakePlatform(),
+        botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+      );
+
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.pubGet,
+        checkUpToDate: true,
+      );
+
+      expect(processManager, hasNoRemainingExpectations);
+      expect(fileSystem.file('.dart_tool/version').readAsStringSync(), 'b');
+    });
+
+    testWithoutContext('does not skip pub get if package_config.json has "generator": "pub"', () async {
+      final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+        const FakeCommand(command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+        ]),
+      ]);
+      final BufferLogger logger = BufferLogger.test();
+      final MemoryFileSystem fileSystem = MemoryFileSystem.test();
+
+      fileSystem.file('pubspec.yaml').createSync();
+      fileSystem.file('pubspec.lock').createSync();
+      fileSystem.file('.dart_tool/package_config.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('''
+  {
+    "configVersion": 2,
+    "packages": [],
+    "generated": "2021-07-08T10:02:49.155589Z",
+    "generator": "pub",
+    "generatorVersion": "2.14.0-276.0.dev"
+  }
+  ''');
+      fileSystem.file('.dart_tool/version').writeAsStringSync('a');
+      fileSystem.file('version').writeAsStringSync('b');
+
+      final Pub pub = Pub(
+        fileSystem: fileSystem,
+        logger: logger,
+        processManager: processManager,
+        usage: TestUsage(),
+        platform: FakePlatform(),
+        botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+      );
+
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.pubGet,
+        checkUpToDate: true,
+      );
+
+      expect(processManager, hasNoRemainingExpectations);
+      expect(fileSystem.file('.dart_tool/version').readAsStringSync(), 'b');
+    });
+
+    testWithoutContext('skips pub get if the package config "generator" is '
+      'different than "pub"', () async {
+      final FakeProcessManager processManager = FakeProcessManager.empty();
+      final BufferLogger logger = BufferLogger.test();
+      final MemoryFileSystem fileSystem = MemoryFileSystem.test();
+
+      fileSystem.file('pubspec.yaml').createSync();
+      fileSystem.file('pubspec.lock').createSync();
+      fileSystem.file('.dart_tool/package_config.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"generator": "third-party"}');
+
+      final Pub pub = Pub(
+        fileSystem: fileSystem,
+        logger: logger,
+        processManager: processManager,
+        usage: TestUsage(),
+        platform: FakePlatform(),
+        botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+      );
+
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.pubGet,
+        checkUpToDate: true,
+      );
+
+      expect(
+        logger.traceText,
+        contains('Skipping pub get: generated by third-party.'),
+      );
+    });
   });
 
   testWithoutContext('checkUpToDate skips pub get if the package config is newer than the pubspec '
@@ -64,13 +254,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -82,11 +272,13 @@ void main() {
     'but the current framework version is not the same as the last version', () async {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
-      ])
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+      ]),
     ]);
     final BufferLogger logger = BufferLogger.test();
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
@@ -102,13 +294,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -121,11 +313,13 @@ void main() {
     'but the current framework version does not exist yet', () async {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
-      ])
+           'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+      ]),
     ]);
     final BufferLogger logger = BufferLogger.test();
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
@@ -140,13 +334,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -159,13 +353,15 @@ void main() {
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       FakeCommand(command: const <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
       ], onRun: () {
         fileSystem.file('.dart_tool/package_config.json').createSync(recursive: true);
-      })
+      }),
     ]);
     final BufferLogger logger = BufferLogger.test();
 
@@ -178,13 +374,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -197,10 +393,12 @@ void main() {
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
       ]),
     ]);
     final BufferLogger logger = BufferLogger.test();
@@ -215,13 +413,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -233,11 +431,13 @@ void main() {
   testWithoutContext('checkUpToDate does not skip pub get if the package config is older that the pubspec', () async {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
-      ])
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+      ]),
     ]);
     final BufferLogger logger = BufferLogger.test();
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
@@ -254,13 +454,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -272,11 +472,13 @@ void main() {
   testWithoutContext('checkUpToDate does not skip pub get if the pubspec.lock is older that the pubspec', () async {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
-      ])
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+      ]),
     ]);
     final BufferLogger logger = BufferLogger.test();
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
@@ -295,13 +497,13 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.pubGet,
       checkUpToDate: true,
     );
@@ -315,10 +517,12 @@ void main() {
 
     const FakeCommand pubGetCommand = FakeCommand(
       command: <String>[
-        'bin/cache/dart-sdk/bin/pub',
-        '--verbosity=warning',
-        'get',
-        '--no-precompile',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
       ],
       exitCode: 69,
       environment: <String, String>{'FLUTTER_ROOT': '', 'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests'},
@@ -342,15 +546,17 @@ void main() {
       logger: logger,
       processManager: processManager,
       usage: TestUsage(),
-      platform: FakePlatform(
-        environment: const <String, String>{},
-      ),
+      platform: FakePlatform(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     FakeAsync().run((FakeAsync time) {
       expect(logger.statusText, '');
-      pub.get(context: PubContext.flutterTests).then((void value) {
+      pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+      ).then((void value) {
         error = 'test completed unexpectedly';
       }, onError: (dynamic thrownError) {
         error = 'test failed unexpectedly: $thrownError';
@@ -404,6 +610,58 @@ void main() {
     expect(processManager, hasNoRemainingExpectations);
   });
 
+  testWithoutContext('pub get offline does not retry', () async {
+    String? error;
+
+    const FakeCommand pubGetCommand = FakeCommand(
+      command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--offline',
+          '--example',
+      ],
+      exitCode: 69,
+      environment: <String, String>{'FLUTTER_ROOT': '', 'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests'},
+    );
+    final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+      pubGetCommand,
+    ]);
+    final BufferLogger logger = BufferLogger.test();
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final Pub pub = Pub(
+      fileSystem: fileSystem,
+      logger: logger,
+      processManager: processManager,
+      usage: TestUsage(),
+      platform: FakePlatform(),
+      botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+    );
+
+    FakeAsync().run((FakeAsync time) {
+      expect(logger.statusText, '');
+      pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+        offline: true
+      ).then((void value) {
+        error = 'test completed unexpectedly';
+      }, onError: (dynamic thrownError) {
+        error = 'test failed unexpectedly: $thrownError';
+      });
+      time.elapse(const Duration(milliseconds: 500));
+      expect(logger.statusText,
+        'Running "flutter pub get" in /...\n'
+      );
+    });
+    expect(logger.errorText, isEmpty);
+    expect(error, contains('test failed unexpectedly: Exception: pub get failed'));
+    expect(processManager, hasNoRemainingExpectations);
+  });
+
   testWithoutContext('pub get 66 shows message from pub', () async {
     final BufferLogger logger = BufferLogger.test();
     final FileSystem fileSystem = MemoryFileSystem.test();
@@ -411,10 +669,12 @@ void main() {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         exitCode: 66,
         stderr: 'err1\nerr2\nerr3\n',
@@ -422,65 +682,157 @@ void main() {
         environment: <String, String>{'FLUTTER_ROOT': '', 'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests'},
       ),
     ]);
-
+    final FakeStdio mockStdio = FakeStdio();
     final Pub pub = Pub(
-      platform: FakePlatform(environment: const <String, String>{}),
+      platform: FakePlatform(),
       fileSystem: fileSystem,
       logger: logger,
       usage: TestUsage(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: mockStdio,
       processManager: processManager,
     );
+    const String toolExitMessage = '''
+pub get failed
+command: "bin/cache/dart-sdk/bin/dart __deprecated_pub --directory . get --example"
+pub env: {
+  "FLUTTER_ROOT": "",
+  "PUB_ENVIRONMENT": "flutter_cli:flutter_tests",
+}
+exit code: 66
+last line of pub output: "err3"
+''';
     await expectLater(
-      () => pub.get(context: PubContext.flutterTests),
-      throwsA(isA<ToolExit>().having((ToolExit error) => error.message, 'message', 'pub get failed (66; err3)')),
+      () => pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+      ),
+      throwsA(isA<ToolExit>().having((ToolExit error) => error.message, 'message', toolExitMessage)),
     );
-    expect(logger.statusText,
-      'Running "flutter pub get" in /...\n'
-      'out1\n'
-      'out2\n'
-      'out3\n'
+    expect(logger.statusText, 'Running "flutter pub get" in /...\n');
+    expect(
+      mockStdio.stdout.writes.map(utf8.decode),
+      <String>[
+        'out1\n',
+        'out2\n',
+        'out3\n',
+      ]
     );
-    expect(logger.errorText,
-      'err1\n'
-      'err2\n'
-      'err3\n'
+    expect(
+      mockStdio.stderr.writes.map(utf8.decode),
+      <String>[
+        'err1\n',
+        'err2\n',
+        'err3\n',
+      ]
     );
     expect(processManager, hasNoRemainingExpectations);
   });
 
-  testWithoutContext('pub cache in root is used', () async {
-    String? error;
+  testWithoutContext('pub get shows working directory on process exception', () async {
+    final BufferLogger logger = BufferLogger.test();
     final FileSystem fileSystem = MemoryFileSystem.test();
-    final Directory pubCache = fileSystem.directory(Cache.flutterRoot).childDirectory('.pub-cache')..createSync();
+
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       FakeCommand(
         command: const <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
+        ],
+        onRun: () {
+          throw const ProcessException(
+            'bin/cache/dart-sdk/bin/dart',
+            <String>[
+              '__deprecated_pub',
+              '--directory',
+              '.',
+              'get',
+              '--example',
+            ],
+            'message',
+            1,
+          );
+        },
+        exitCode: 66,
+        stderr: 'err1\nerr2\nerr3\n',
+        stdout: 'out1\nout2\nout3\n',
+        environment: const <String, String>{'FLUTTER_ROOT': '', 'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests'},
+      ),
+    ]);
+
+    final Pub pub = Pub(
+      platform: FakePlatform(),
+      fileSystem: fileSystem,
+      logger: logger,
+      usage: TestUsage(),
+      botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+      processManager: processManager,
+    );
+    await expectLater(
+      () => pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+      ),
+      throwsA(
+        isA<ProcessException>().having(
+          (ProcessException error) => error.message,
+          'message',
+          contains('Working directory: "/" (exists)'),
+        ).having(
+          (ProcessException error) => error.message,
+          'message',
+          contains('"PUB_ENVIRONMENT": "flutter_cli:flutter_tests"'),
+        ),
+      ),
+    );
+    expect(logger.statusText,
+      'Running "flutter pub get" in /...\n'
+    );
+    expect(logger.errorText, isEmpty);
+    expect(processManager, hasNoRemainingExpectations);
+  });
+
+  testWithoutContext('pub cache in flutter root is ignored', () async {
+    String? error;
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+      const FakeCommand(
+        command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
         ],
         exitCode: 69,
         environment: <String, String>{
           'FLUTTER_ROOT': '',
           'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests',
-          'PUB_CACHE': pubCache.path,
         },
       ),
     ]);
 
     final Pub pub = Pub(
-      platform: FakePlatform(environment: const <String, String>{}),
+      platform: FakePlatform(),
       usage: TestUsage(),
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       processManager: processManager,
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
 
     FakeAsync().run((FakeAsync time) {
-      pub.get(context: PubContext.flutterTests).then((void value) {
+      pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests
+      ).then((void value) {
         error = 'test completed unexpectedly';
       }, onError: (dynamic thrownError) {
         error = 'test failed unexpectedly: $thrownError';
@@ -491,16 +843,94 @@ void main() {
     });
   });
 
+  testWithoutContext('pub cache local is merge to global', () async {
+    String? error;
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final Directory local = fileSystem.currentDirectory.childDirectory('.pub-cache');
+    final Directory global = fileSystem.currentDirectory.childDirectory('/global');
+    global.createSync();
+    for (final Directory dir in <Directory>[global.childDirectory('.pub-cache'), local]) {
+      dir.createSync();
+      dir.childDirectory('hosted').createSync();
+      dir.childDirectory('hosted').childDirectory('pub.dartlang.org').createSync();
+    }
+
+    final Directory globalHosted = global.childDirectory('.pub-cache').childDirectory('hosted').childDirectory('pub.dartlang.org');
+    globalHosted.childFile('first.file').createSync();
+    globalHosted.childDirectory('dir').createSync();
+
+    final Directory localHosted = local.childDirectory('hosted').childDirectory('pub.dartlang.org');
+    localHosted.childFile('second.file').writeAsBytesSync(<int>[0]);
+    localHosted.childDirectory('dir').createSync();
+    localHosted.childDirectory('dir').childFile('third.file').writeAsBytesSync(<int>[0]);
+    localHosted.childDirectory('dir_2').createSync();
+    localHosted.childDirectory('dir_2').childFile('fourth.file').writeAsBytesSync(<int>[0]);
+
+    final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+      const FakeCommand(
+        command: <String>[
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
+          'get',
+          '--example',
+        ],
+        exitCode: 69,
+        environment: <String, String>{
+          'FLUTTER_ROOT': '',
+          'PUB_CACHE': '/global/.pub-cache',
+          'PUB_ENVIRONMENT': 'flutter_cli:flutter_tests',
+        },
+      ),
+    ]);
+
+    final Platform platform = FakePlatform(
+      environment: <String, String>{'HOME': '/global'}
+    );
+    final Pub pub = Pub(
+      platform: platform,
+      usage: TestUsage(),
+      fileSystem: fileSystem,
+      logger: BufferLogger.test(),
+      processManager: processManager,
+      botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
+    );
+
+    FakeAsync().run((FakeAsync time) {
+      pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+      ).then((void value) {
+        error = 'test completed unexpectedly';
+      }, onError: (dynamic thrownError) {
+        error = thrownError.toString();
+      });
+      time.elapse(const Duration(milliseconds: 500));
+      expect(error, isNull);
+      expect(processManager, hasNoRemainingExpectations);
+      expect(local.existsSync(), false);
+      expect(globalHosted.childFile('second.file').existsSync(), false);
+      expect(
+          globalHosted.childDirectory('dir').childFile('third.file').existsSync(), false
+      ); // do not copy dependencies that are already downloaded
+      expect(globalHosted.childDirectory('dir_2').childFile('fourth.file').existsSync(), true);
+    });
+  });
+
   testWithoutContext('pub cache in environment is used', () async {
     final FileSystem fileSystem = MemoryFileSystem.test();
     fileSystem.directory('custom/pub-cache/path').createSync(recursive: true);
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         exitCode: 69,
         environment: <String, String>{
@@ -516,6 +946,7 @@ void main() {
       processManager: processManager,
       usage: TestUsage(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
       platform: FakePlatform(
         environment: const <String, String>{
           'PUB_CACHE': 'custom/pub-cache/path',
@@ -525,7 +956,9 @@ void main() {
 
     FakeAsync().run((FakeAsync time) {
       String? error;
-      pub.get(context: PubContext.flutterTests).then((void value) {
+      pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests).then((void value) {
         error = 'test completed unexpectedly';
       }, onError: (dynamic thrownError) {
         error = 'test failed unexpectedly: $thrownError';
@@ -544,6 +977,7 @@ void main() {
       logger: BufferLogger.test(),
       processManager: FakeProcessManager.any(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
       usage: usage,
       platform: FakePlatform(
         environment: const <String, String>{
@@ -558,8 +992,8 @@ void main() {
       ..writeAsStringSync('{"configVersion": 2,"packages": []}');
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.flutterTests,
-      generateSyntheticPackage: true,
     );
     expect(usage.events, contains(
       const TestUsageEvent('pub-result', 'flutter-tests', label: 'success'),
@@ -574,6 +1008,7 @@ void main() {
       logger: BufferLogger.test(),
       processManager: FakeProcessManager.any(),
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
       usage: usage,
       platform: FakePlatform(
         environment: const <String, String>{
@@ -597,8 +1032,8 @@ void main() {
 ''');
 
     await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
       context: PubContext.flutterTests,
-      generateSyntheticPackage: true,
     );
 
     expect(
@@ -619,10 +1054,12 @@ void main() {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         exitCode: 1,
       ),
@@ -634,6 +1071,7 @@ void main() {
       logger: BufferLogger.test(),
       processManager: processManager,
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
       platform: FakePlatform(
         environment: const <String, String>{
           'PUB_CACHE': 'custom/pub-cache/path',
@@ -641,7 +1079,10 @@ void main() {
       ),
     );
     try {
-      await pub.get(context: PubContext.flutterTests);
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests,
+      );
     } on ToolExit {
       // Ignore.
     }
@@ -660,10 +1101,12 @@ void main() {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         exitCode: 1,
         stderr: 'version solving failed',
@@ -681,11 +1124,15 @@ void main() {
       ),
       usage: usage,
       botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio(),
     );
     fileSystem.file('pubspec.yaml').writeAsStringSync('name: foo');
 
     try {
-      await pub.get(context: PubContext.flutterTests);
+      await pub.get(
+        project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+        context: PubContext.flutterTests
+      );
     } on ToolExit {
       // Ignore.
     }
@@ -702,10 +1149,12 @@ void main() {
     final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
       FakeCommand(
         command: const <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         onRun: () {
           fileSystem.file('.dart_tool/package_config.json')
@@ -714,18 +1163,22 @@ void main() {
       ),
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
       ),
       FakeCommand(
         command: const <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
         onRun: () {
           fileSystem.file('pubspec.yaml')
@@ -734,10 +1187,12 @@ void main() {
       ),
       const FakeCommand(
         command: <String>[
-          'bin/cache/dart-sdk/bin/pub',
-          '--verbosity=warning',
+          'bin/cache/dart-sdk/bin/dart',
+          '__deprecated_pub',
+          '--directory',
+          '.',
           'get',
-          '--no-precompile',
+          '--example',
         ],
       ),
     ]);
@@ -747,10 +1202,10 @@ void main() {
       logger: logger,
       processManager: processManager,
       platform: FakePlatform(
-        operatingSystem: 'linux', // so that the command executed is consistent
         environment: <String, String>{},
       ),
-      botDetector: const BotDetectorAlwaysNo()
+      botDetector: const BotDetectorAlwaysNo(),
+      stdio: FakeStdio()
     );
 
     fileSystem.file('version').createSync();
@@ -761,7 +1216,10 @@ void main() {
     fileSystem.file('pubspec.yaml')
       ..createSync()
       ..setLastModifiedSync(DateTime(2001));
-    await pub.get(context: PubContext.flutterTests); // pub sets date of .packages to 2002
+    await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+      context: PubContext.flutterTests,
+    ); // pub sets date of .packages to 2002
 
     expect(logger.statusText, 'Running "flutter pub get" in /...\n');
     expect(logger.errorText, isEmpty);
@@ -773,7 +1231,10 @@ void main() {
       .setLastModifiedSync(DateTime(2000));
     fileSystem.file('pubspec.yaml')
       .setLastModifiedSync(DateTime(2001));
-    await pub.get(context: PubContext.flutterTests); // pub does nothing
+    await pub.get(
+      project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+      context: PubContext.flutterTests,
+    ); // pub does nothing
 
     expect(logger.statusText, 'Running "flutter pub get" in /...\n');
     expect(logger.errorText, isEmpty);

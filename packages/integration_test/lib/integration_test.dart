@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io' show HttpClient, SocketException, WebSocket;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -12,11 +13,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vm_service/vm_service.dart' as vm;
-import 'package:vm_service/vm_service_io.dart' as vm_io;
 
 import '_callback_io.dart' if (dart.library.html) '_callback_web.dart' as driver_actions;
 import '_extension_io.dart' if (dart.library.html) '_extension_web.dart';
 import 'common.dart';
+import 'src/channel.dart';
 
 const String _success = 'success';
 
@@ -40,7 +41,7 @@ class IntegrationTestWidgetsFlutterBinding extends LiveTestWidgetsFlutterBinding
   IntegrationTestWidgetsFlutterBinding() {
     tearDownAll(() async {
       if (!_allTestsPassed.isCompleted) {
-        _allTestsPassed.complete(true);
+        _allTestsPassed.complete(failureMethodsDetails.isEmpty);
       }
       callbackManager.cleanup();
 
@@ -51,7 +52,7 @@ class IntegrationTestWidgetsFlutterBinding extends LiveTestWidgetsFlutterBinding
       }
 
       try {
-        await _channel.invokeMethod<void>(
+        await integrationTestChannel.invokeMethod<void>(
           'allTestsFinished',
           <String, dynamic>{
             'results': results.map<String, dynamic>((String name, Object result) {
@@ -59,11 +60,11 @@ class IntegrationTestWidgetsFlutterBinding extends LiveTestWidgetsFlutterBinding
                 return MapEntry<String, dynamic>(name, result.details);
               }
               return MapEntry<String, Object>(name, result);
-            })
+            }),
           },
         );
       } on MissingPluginException {
-        print(r'''
+        debugPrint(r'''
 Warning: integration_test plugin was not detected.
 
 If you're running the tests with `flutter drive`, please make sure your tests
@@ -83,9 +84,6 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
     reportTestException =
         (FlutterErrorDetails details, String testDescription) {
       results[testDescription] = Failure(testDescription, details.toString());
-      if (!_allTestsPassed.isCompleted) {
-        _allTestsPassed.complete(false);
-      }
       oldTestExceptionReporter(details, testDescription);
     };
   }
@@ -133,22 +131,34 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   final Completer<bool> _allTestsPassed = Completer<bool>();
 
   @override
-  List<Failure> get failureMethodsDetails => _failures;
+  List<Failure> get failureMethodsDetails => results.values.whereType<Failure>().toList();
 
-  /// Similar to [WidgetsFlutterBinding.ensureInitialized].
-  ///
-  /// Returns an instance of the [IntegrationTestWidgetsFlutterBinding], creating and
-  /// initializing it if necessary.
-  static WidgetsBinding ensureInitialized() {
-    if (WidgetsBinding.instance == null) {
-      IntegrationTestWidgetsFlutterBinding();
-    }
-    assert(WidgetsBinding.instance is IntegrationTestWidgetsFlutterBinding);
-    return WidgetsBinding.instance!;
+  @override
+  void initInstances() {
+    super.initInstances();
+    _instance = this;
   }
 
-  static const MethodChannel _channel =
-      MethodChannel('plugins.flutter.io/integration_test');
+  /// The singleton instance of this object.
+  ///
+  /// Provides access to the features exposed by this class. The binding must
+  /// be initialized before using this getter; this is typically done by calling
+  /// [IntegrationTestWidgetsFlutterBinding.ensureInitialized].
+  static IntegrationTestWidgetsFlutterBinding get instance => BindingBase.checkInstance(_instance);
+  static IntegrationTestWidgetsFlutterBinding? _instance;
+
+  /// Returns an instance of the [IntegrationTestWidgetsFlutterBinding], creating and
+  /// initializing it if necessary.
+  ///
+  /// See also:
+  ///
+  ///  * [WidgetsFlutterBinding.ensureInitialized], the equivalent in the widgets framework.
+  static IntegrationTestWidgetsFlutterBinding ensureInitialized() {
+    if (_instance == null) {
+      IntegrationTestWidgetsFlutterBinding();
+    }
+    return _instance!;
+  }
 
   /// Test results that will be populated after the tests have completed.
   ///
@@ -156,8 +166,6 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   /// a [Failure].
   @visibleForTesting
   Map<String, Object> results = <String, Object>{};
-
-  List<Failure> get _failures => results.values.whereType<Failure>().toList();
 
   /// The extra data for the reported result.
   ///
@@ -172,11 +180,29 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   /// side.
   final CallbackManager callbackManager = driver_actions.callbackManager;
 
-  /// Taking a screenshot.
+  /// Takes a screenshot.
   ///
-  /// Called by test methods. Implementation differs for each platform.
-  Future<void> takeScreenshot(String screenshotName) async {
-    await callbackManager.takeScreenshot(screenshotName);
+  /// On Android, you need to call `convertFlutterSurfaceToImage()`, and
+  /// pump a frame before taking a screenshot.
+  Future<List<int>> takeScreenshot(String screenshotName) async {
+    reportData ??= <String, dynamic>{};
+    reportData!['screenshots'] ??= <dynamic>[];
+    final Map<String, dynamic> data = await callbackManager.takeScreenshot(screenshotName);
+    assert(data.containsKey('bytes'));
+
+    (reportData!['screenshots']! as List<dynamic>).add(data);
+    return data['bytes']! as List<int>;
+  }
+
+  /// Android only. Converts the Flutter surface to an image view.
+  /// Be aware that if you are conducting a perf test, you may not want to call
+  /// this method since the this is an expensive operation that affects the
+  /// rendering of a Flutter app.
+  ///
+  /// Once the screenshot is taken, call `revertFlutterImage()` to restore
+  /// the original Flutter surface.
+  Future<void> convertFlutterSurfaceToImage() async {
+    await callbackManager.convertFlutterSurfaceToImage();
   }
 
   /// The callback function to response the driver side input.
@@ -203,13 +229,16 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
     Future<void> Function() testBody,
     VoidCallback invariantTester, {
     String description = '',
+    @Deprecated(
+      'This parameter has no effect. Use the `timeout` parameter on `testWidgets` instead. '
+      'This feature was deprecated after v2.6.0-1.0.pre.'
+    )
     Duration? timeout,
   }) async {
     await super.runTest(
       testBody,
       invariantTester,
       description: description,
-      timeout: timeout,
     );
     results[description] ??= _success;
   }
@@ -221,6 +250,7 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   Future<void> enableTimeline({
     List<String> streams = const <String>['all'],
     @visibleForTesting vm.VmService? vmService,
+    @visibleForTesting HttpClient? httpClient,
   }) async {
     assert(streams != null);
     assert(streams.isNotEmpty);
@@ -230,9 +260,18 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
     if (_vmService == null) {
       final developer.ServiceProtocolInfo info = await developer.Service.getInfo();
       assert(info.serverUri != null);
-      _vmService = await vm_io.vmServiceConnectUri(
-        'ws://localhost:${info.serverUri!.port}${info.serverUri!.path}ws',
-      );
+      final String address = 'ws://localhost:${info.serverUri!.port}${info.serverUri!.path}ws';
+      try {
+        _vmService = await _vmServiceConnectUri(address, httpClient: httpClient);
+      } on SocketException catch(e, s) {
+        throw StateError(
+          'Failed to connect to VM Service at $address.\n'
+          'This may happen if DDS is enabled. If this test was launched via '
+          '`flutter drive`, try adding `--no-dds`.\n'
+          'The original exception was:\n'
+          '$e\n$s',
+        );
+      }
     }
     await _vmService!.setVMTimelineFlags(streams);
   }
@@ -245,7 +284,7 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   /// The `streams` parameter limits the recorded timeline event streams to only
   /// the ones listed. By default, all streams are recorded.
   /// See `timeline_streams` in
-  /// [Dart-SDK/runtime/vm/timeline.cc](https://github.com/dart-lang/sdk/blob/master/runtime/vm/timeline.cc)
+  /// [Dart-SDK/runtime/vm/timeline.cc](https://github.com/dart-lang/sdk/blob/main/runtime/vm/timeline.cc)
   ///
   /// If [retainPriorEvents] is true, retains events recorded prior to calling
   /// [action]. Otherwise, prior events are cleared before calling [action]. By
@@ -271,8 +310,8 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
     );
   }
 
-  /// This is a convenience wrap of [traceTimeline] and send the result back to
-  /// the host for the [flutter_driver] style tests.
+  /// This is a convenience method that calls [traceTimeline] and sends the
+  /// result back to the host for the [flutter_driver] style tests.
   ///
   /// This records the timeline during `action` and adds the result to
   /// [reportData] with `reportKey`. The [reportData] contains extra information
@@ -282,7 +321,30 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   /// to `build/integration_response_data.json` with the key `timeline`.
   ///
   /// For tests with multiple calls of this method, `reportKey` needs to be a
-  /// unique key, otherwise the later result will override earlier one.
+  /// unique key, otherwise the later result will override earlier one. Tests
+  /// that call this multiple times must also provide a custom
+  /// [ResponseDataCallback] to decide where and how to write the output
+  /// timelines. For example,
+  ///
+  /// ```dart
+  /// import 'package:integration_test/integration_test_driver.dart';
+  ///
+  /// Future<void> main() {
+  ///   return integrationDriver(
+  ///     responseDataCallback: (data) async {
+  ///       if (data != null) {
+  ///         for (var entry in data.entries) {
+  ///           print('Writing ${entry.key} to the disk.');
+  ///           await writeResponseData(
+  ///             entry.value as Map<String, dynamic>,
+  ///             testOutputFilename: entry.key,
+  ///           );
+  ///         }
+  ///       }
+  ///     },
+  ///   );
+  /// }
+  /// ```
   ///
   /// The `streams` and `retainPriorEvents` parameters are passed as-is to
   /// [traceTimeline].
@@ -354,7 +416,7 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
         count++;
         await Future<void>.delayed(const Duration(seconds: 2));
         if (count > 20) {
-          print('delayForFrameTimings is taking longer than expected...');
+          debugPrint('delayForFrameTimings is taking longer than expected...');
         }
       }
     }
@@ -377,13 +439,7 @@ https://flutter.dev/docs/testing/integration-tests#testing-on-firebase-test-lab
   }
 
   @override
-  Timeout get defaultTestTimeout => _defaultTestTimeout ?? super.defaultTestTimeout;
-
-  /// Configures the default timeout for [testWidgets].
-  ///
-  /// See [TestWidgetsFlutterBinding.defaultTestTimeout] for more details.
-  set defaultTestTimeout(Timeout timeout) => _defaultTestTimeout = timeout;
-  Timeout? _defaultTestTimeout;
+  Timeout defaultTestTimeout = Timeout.none;
 
   @override
   void attachRootWidget(Widget rootWidget) {
@@ -415,4 +471,30 @@ class _GarbageCollectionInfo {
 
   final int oldCount;
   final int newCount;
+}
+
+// Connect to the given uri and return a new [VmService] instance.
+//
+// Copied from vm_service_io so that we can pass a custom [HttpClient] for
+// testing. Currently, the WebSocket API reuses an HttpClient that
+// is created before the test can change the HttpOverrides.
+Future<vm.VmService> _vmServiceConnectUri(
+  String wsUri, {
+  HttpClient? httpClient,
+}) async {
+  final WebSocket socket = await WebSocket.connect(wsUri, customClient: httpClient);
+  final StreamController<dynamic> controller = StreamController<dynamic>();
+  final Completer<void> streamClosedCompleter = Completer<void>();
+
+  socket.listen(
+    (dynamic data) => controller.add(data),
+    onDone: () => streamClosedCompleter.complete(),
+  );
+
+  return vm.VmService(
+    controller.stream,
+    (String message) => socket.add(message),
+    disposeHandler: () => socket.close(),
+    streamClosed: streamClosedCompleter.future,
+  );
 }

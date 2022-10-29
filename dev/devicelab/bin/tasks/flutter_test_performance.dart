@@ -65,11 +65,11 @@ Future<int> runTest({bool coverage = false, bool noPub = false}) async {
       // we have a blank line at the start
       step = TestStep.testWritesFirstCarriageReturn;
     } else {
-      final Match match = testOutputPattern.matchAsPrefix(entry);
+      final Match? match = testOutputPattern.matchAsPrefix(entry);
       if (match == null) {
         badLines += 1;
       } else {
-        if (step.index >= TestStep.testWritesFirstCarriageReturn.index && step.index <= TestStep.testLoading.index && match.group(1).startsWith('loading ')) {
+        if (step.index >= TestStep.testWritesFirstCarriageReturn.index && step.index <= TestStep.testLoading.index && match.group(1)!.startsWith('loading ')) {
           // first the test loads
           step = TestStep.testLoading;
         } else if (step.index <= TestStep.testRunning.index && match.group(1) == 'A trivial widget test') {
@@ -90,12 +90,15 @@ Future<int> runTest({bool coverage = false, bool noPub = false}) async {
   });
   final int result = await analysis.exitCode;
   clock.stop();
-  if (result != 0)
+  if (result != 0) {
     throw Exception('flutter test failed with exit code $result');
-  if (badLines > 0)
+  }
+  if (badLines > 0) {
     throw Exception('flutter test rendered unexpected output ($badLines bad lines)');
-  if (step != TestStep.testPassed)
+  }
+  if (step != TestStep.testPassed) {
     throw Exception('flutter test did not finish (only reached step $step)');
+  }
   print('elapsed time: ${clock.elapsedMilliseconds}ms');
   return clock.elapsedMilliseconds;
 }

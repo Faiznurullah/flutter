@@ -25,24 +25,30 @@
 /// about any additional exports that you add to this file, as doing so will
 /// increase the API surface that we have to test in Flutter tools, and the APIs
 /// in `dart:io` can sometimes be hard to use in tests.
+
+// We allow `print()` in this file as a fallback for writing to the terminal via
+// regular stdout/stderr/stdio paths. Everything else in the flutter_tools
+// library should route terminal I/O through the [Stdio] class defined below.
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:io' as io
   show
-    exit,
+    IOSink,
     InternetAddress,
     InternetAddressType,
-    IOSink,
     NetworkInterface,
-    pid,
     Process,
     ProcessInfo,
     ProcessSignal,
-    stderr,
-    stdin,
     Stdin,
     StdinException,
     Stdout,
     StdoutException,
+    exit,
+    pid,
+    stderr,
+    stdin,
     stdout;
 
 import 'package:file/file.dart';
@@ -57,10 +63,8 @@ export 'dart:io'
         BytesBuilder,
         CompressionOptions,
         // Directory,         NO! Use `file_system.dart`
-        exitCode,
         // File,              NO! Use `file_system.dart`
         // FileSystemEntity,  NO! Use `file_system.dart`
-        gzip,
         GZipCodec,
         HandshakeException,
         HttpClient,
@@ -73,14 +77,13 @@ export 'dart:io'
         HttpResponse,
         HttpServer,
         HttpStatus,
-        InternetAddress,
-        InternetAddressType,
         IOException,
         IOSink,
+        InternetAddress,
+        InternetAddressType,
         // Link              NO! Use `file_system.dart`
         // NetworkInterface  NO! Use `io.dart`
         OSError,
-        pid,
         // Platform          NO! use `platform.dart`
         Process,
         ProcessException,
@@ -91,19 +94,22 @@ export 'dart:io'
         // RandomAccessFile  NO! Use `file_system.dart`
         ServerSocket,
         SignalException,
-        // stderr,           NO! Use `io.dart`
-        // stdin,            NO! Use `io.dart`
-        Stdin,
-        StdinException,
-        // stdout,           NO! Use `io.dart`
-        Stdout,
         Socket,
         SocketException,
-        systemEncoding,
+        Stdin,
+        StdinException,
+        Stdout,
         WebSocket,
         WebSocketException,
         WebSocketTransformer,
-        ZLibEncoder;
+        ZLibEncoder,
+        exitCode,
+        gzip,
+        pid,
+        // stderr,           NO! Use `io.dart`
+        // stdin,            NO! Use `io.dart`
+        // stdout,           NO! Use `io.dart`
+        systemEncoding;
 
 /// Exits the process with the given [exitCode].
 typedef ExitFunction = void Function(int exitCode);
@@ -203,8 +209,7 @@ class ProcessSignal {
 @visibleForTesting
 class PosixProcessSignal extends ProcessSignal {
 
-  const PosixProcessSignal(io.ProcessSignal wrappedSignal, {@visibleForTesting Platform platform = const LocalPlatform()})
-    : super(wrappedSignal, platform: platform);
+  const PosixProcessSignal(super.wrappedSignal, {@visibleForTesting super.platform});
 
   @override
   Stream<ProcessSignal> watch() {
@@ -363,7 +368,7 @@ class Stdio {
   /// Adds [stream] to [stdout].
   Future<void> addStdoutStream(Stream<List<int>> stream) => stdout.addStream(stream);
 
-  /// Adds [srtream] to [stderr].
+  /// Adds [stream] to [stderr].
   Future<void> addStderrStream(Stream<List<int>> stream) => stderr.addStream(stream);
 }
 

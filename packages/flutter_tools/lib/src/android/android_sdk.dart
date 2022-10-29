@@ -9,7 +9,7 @@ import '../base/platform.dart';
 import '../base/process.dart';
 import '../base/version.dart';
 import '../convert.dart';
-import '../globals_null_migrated.dart' as globals;
+import '../globals.dart' as globals;
 import 'android_studio.dart';
 
 // ANDROID_HOME is deprecated.
@@ -169,8 +169,7 @@ class AndroidSdk {
 
   AndroidSdkVersion? get latestVersion => _latestVersion;
 
-  String? get adbPath => _adbPath ??= getPlatformToolsPath(globals.platform.isWindows ? 'adb.exe' : 'adb');
-  String? _adbPath;
+  late final String? adbPath = getPlatformToolsPath(globals.platform.isWindows ? 'adb.exe' : 'adb');
 
   String? get emulatorPath => getEmulatorPath();
 
@@ -199,7 +198,7 @@ class AndroidSdk {
       }
     }
 
-    for (final String searchPath in searchPaths.whereType<String>()) {
+    for (final String searchPath in searchPaths) {
       if (globals.fs.directory(searchPath).existsSync()) {
         return searchPath;
       }
@@ -355,12 +354,16 @@ class AndroidSdk {
           platformVersion = int.parse(numberedVersion.group(1)!);
         } else {
           final String buildProps = platformDir.childFile('build.prop').readAsStringSync();
-          final String? versionString = const LineSplitter()
+          final Iterable<Match> versionMatches = const LineSplitter()
               .convert(buildProps)
               .map<RegExpMatch?>(_sdkVersionRe.firstMatch)
-              .whereType<Match>()
-              .first
-              .group(1);
+              .whereType<Match>();
+
+          if (versionMatches.isEmpty) {
+            return null;
+          }
+
+          final String? versionString = versionMatches.first.group(1);
           if (versionString == null) {
             return null;
           }
@@ -540,7 +543,7 @@ class AndroidSdkVersion implements Comparable<AndroidSdkVersion> {
   }
 
   String getBuildToolsPath(String binaryName) {
-   return sdk.directory.childDirectory('build-tools').childDirectory(buildToolsVersionName).childFile(binaryName).path;
+    return sdk.directory.childDirectory('build-tools').childDirectory(buildToolsVersionName).childFile(binaryName).path;
   }
 
   @override

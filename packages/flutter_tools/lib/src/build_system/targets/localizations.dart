@@ -23,9 +23,6 @@ class GenerateLocalizationsTarget extends Target {
   List<Source> get inputs => <Source>[
     // This is added as a convenience for developing the tool.
     const Source.pattern('{FLUTTER_ROOT}/packages/flutter_tools/lib/src/build_system/targets/localizations.dart'),
-    // TODO(jonahwilliams): once https://github.com/flutter/flutter/issues/56321 is
-    // complete, we should add the artifact as a dependency here. Since the tool runs
-    // this code from source, looking up each dependency will be cumbersome.
   ];
 
   @override
@@ -64,9 +61,9 @@ class GenerateLocalizationsTarget extends Target {
       fileSystem: environment.fileSystem,
     );
 
-    final Map<String, Object> dependencies = json.decode(
+    final Map<String, Object?> dependencies = json.decode(
       environment.buildDir.childFile(_kDependenciesFileName).readAsStringSync()
-    ) as Map<String, Object>;
+    ) as Map<String, Object?>;
     final List<Object?>? inputs = dependencies['inputs'] as List<Object?>?;
     final List<Object?>? outputs = dependencies['outputs'] as List<Object?>?;
     final Depfile depfile = Depfile(
@@ -74,12 +71,12 @@ class GenerateLocalizationsTarget extends Target {
         configFile,
         if (inputs != null)
           for (Object inputFile in inputs.whereType<Object>())
-            environment.fileSystem.file(inputFile)
+            environment.fileSystem.file(inputFile),
       ],
       <File>[
         if (outputs != null)
           for (Object outputFile in outputs.whereType<Object>())
-            environment.fileSystem.file(outputFile)
+            environment.fileSystem.file(outputFile),
       ],
     );
     depfileService.writeToFile(

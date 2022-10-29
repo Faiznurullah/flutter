@@ -14,7 +14,7 @@ import 'base/utils.dart';
 import 'plugins.dart';
 
 const Set<String> _kValidPluginPlatforms = <String>{
-  'android', 'ios', 'web', 'windows', 'linux', 'macos'
+  'android', 'ios', 'web', 'windows', 'linux', 'macos',
 };
 
 /// A wrapper around the `flutter` section in the `pubspec.yaml` file.
@@ -68,6 +68,8 @@ class FlutterManifest {
 
   /// A map representation of the `flutter` section in the `pubspec.yaml` file.
   Map<String, Object?> _flutterDescriptor = <String, Object?>{};
+
+  Map<String, Object?> get flutterDescriptor => _flutterDescriptor;
 
   /// True if the `pubspec.yaml` file does not exist.
   bool get isEmpty => _descriptor.isEmpty;
@@ -247,7 +249,7 @@ class FlutterManifest {
         DeferredComponent(
           name: component['name'] as String,
           libraries: component['libraries'] == null ?
-              <String>[] : component['libraries'].cast<String>() as List<String>,
+              <String>[] : (component['libraries'] as List<dynamic>).cast<String>(),
           assets: assetsUri,
         )
       );
@@ -273,7 +275,7 @@ class FlutterManifest {
   Map<String, Object?>? get supportedPlatforms {
     if (isPlugin) {
       final YamlMap? plugin = _flutterDescriptor['plugin'] as YamlMap?;
-      if (plugin?.containsKey('platforms') == true) {
+      if (plugin?.containsKey('platforms') ?? false) {
         final YamlMap? platformsMap = plugin!['platforms'] as YamlMap?;
         return platformsMap?.value.cast<String, Object?>();
       }
@@ -339,11 +341,11 @@ class FlutterManifest {
       final YamlList? fontFiles = fontFamily['fonts'] as YamlList?;
       final String? familyName = fontFamily['family'] as String?;
       if (familyName == null) {
-        _logger.printError('Warning: Missing family name for font.', emphasis: true);
+        _logger.printWarning('Warning: Missing family name for font.', emphasis: true);
         continue;
       }
       if (fontFiles == null) {
-        _logger.printError('Warning: No fonts specified for font $familyName', emphasis: true);
+        _logger.printWarning('Warning: No fonts specified for font $familyName', emphasis: true);
         continue;
       }
 
@@ -351,7 +353,7 @@ class FlutterManifest {
       for (final Map<Object?, Object?> fontFile in fontFiles.cast<Map<Object?, Object?>>()) {
         final String? asset = fontFile['asset'] as String?;
         if (asset == null) {
-          _logger.printError('Warning: Missing asset in fonts for $familyName', emphasis: true);
+          _logger.printWarning('Warning: Missing asset in fonts for $familyName', emphasis: true);
           continue;
         }
 
@@ -366,6 +368,33 @@ class FlutterManifest {
       }
     }
     return fonts;
+  }
+
+
+  late final List<Uri> shaders = _extractShaders();
+
+  List<Uri> _extractShaders() {
+    if (!_flutterDescriptor.containsKey('shaders')) {
+      return <Uri>[];
+    }
+
+    final List<Object?>? shaders = _flutterDescriptor['shaders'] as List<Object?>?;
+    if (shaders == null) {
+      return const <Uri>[];
+    }
+    final List<Uri> results = <Uri>[];
+    for (final Object? shader in shaders) {
+      if (shader is! String || shader == null || shader == '') {
+        _logger.printError('Shader manifest contains a null or empty uri.');
+        continue;
+      }
+      try {
+        results.add(Uri(pathSegments: shader.split('/')));
+      } on FormatException {
+        _logger.printError('Shader manifest contains invalid uri: $shader.');
+      }
+    }
+    return results;
   }
 
   /// Whether a synthetic flutter_gen package should be generated.
@@ -496,7 +525,17 @@ void _validateFlutter(YamlMap? yaml, List<String> errors) {
         break;
       case 'assets':
         if (yamlValue is! YamlList) {
-
+          errors.add('Expected "$yamlKey" to be a list, but got $yamlValue (${yamlValue.runtimeType}).');
+        } else if (yamlValue.isEmpty) {
+          break;
+        } else if (yamlValue[0] is! String) {
+          errors.add(
+            'Expected "$yamlKey" to be a list of strings, but the first element is $yamlValue (${yamlValue.runtimeType}).',
+          );
+        }
+        break;
+      case 'shaders':
+        if (yamlValue is! YamlList) {
           errors.add('Expected "$yamlKey" to be a list, but got $yamlValue (${yamlValue.runtimeType}).');
         } else if (yamlValue.isEmpty) {
           break;
@@ -571,6 +610,7 @@ void _validateFlutter(YamlMap? yaml, List<String> errors) {
 void _validateListType<T>(YamlList yamlList, List<String> errors, String context, String typeAlias) {
   for (int i = 0; i < yamlList.length; i++) {
     if (yamlList[i] is! T) {
+      // ignore: avoid_dynamic_calls
       errors.add('Expected $context to be a list of $typeAlias, but element $i was a ${yamlList[i].runtimeType}');
     }
   }
@@ -584,6 +624,7 @@ void _validateDeferredComponents(MapEntry<Object?, Object?> kvp, List<String> er
     for (int i = 0; i < yamlList.length; i++) {
       final Object? valueMap = yamlList[i];
       if (valueMap is! YamlMap) {
+        // ignore: avoid_dynamic_calls
         errors.add('Expected the $i element in "${kvp.key}" to be a map, but got ${yamlList[i]} (${yamlList[i].runtimeType}).');
         continue;
       }
@@ -634,7 +675,7 @@ void _validateFonts(YamlList fonts, List<String> errors) {
       errors.add('Expected "fonts" to either be null or a list.');
       continue;
     }
-    for (final Object? fontMapList in fontMap['fonts']) {
+    for (final Object? fontMapList in fontMap['fonts'] as List<Object?>) {
       if (fontMapList is! YamlMap) {
         errors.add('Expected "fonts" to be a list of maps.');
         continue;

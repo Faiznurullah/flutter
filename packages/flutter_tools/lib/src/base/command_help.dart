@@ -118,6 +118,11 @@ class CommandHelp {
     'WidgetsApp.showWidgetInspectorOverride',
   );
 
+  late final CommandHelpOption j = _makeOption(
+    'j',
+    'Dump frame raster stats for the current frame. (Unsupported for web)',
+  );
+
   late final CommandHelpOption k = _makeOption(
     'k',
     'Toggle CanvasKit rendering.',
@@ -165,12 +170,6 @@ class CommandHelp {
     'w',
     'Dump widget hierarchy to the console.',
     'debugDumpApp',
-  );
-
-  late final CommandHelpOption z = _makeOption(
-    'z',
-    'Toggle elevation checker.',
-    'debugCheckElevationsEnabled',
   );
 
   // When updating the list above, see the notes above the list regarding order

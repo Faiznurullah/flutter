@@ -111,7 +111,7 @@ class LoadingUnit {
   /// Constructs a [LoadingUnit].
   ///
   /// Loading units must include an [id] and [libraries]. The [path] is only present when
-  /// parsing the loading unit from a laoding unit manifest produced by gen_snapshot.
+  /// parsing the loading unit from a loading unit manifest produced by gen_snapshot.
   LoadingUnit({
     required this.id,
     required this.libraries,
@@ -195,7 +195,7 @@ class LoadingUnit {
     final List<LoadingUnit> loadingUnits = <LoadingUnit>[];
     // Setup android source directory
     if (manifest != null) {
-      for (final dynamic loadingUnitMetadata in manifest['loadingUnits']) {
+      for (final dynamic loadingUnitMetadata in manifest['loadingUnits'] as List<dynamic>) {
         final Map<String, dynamic> loadingUnitMap = loadingUnitMetadata as Map<String, dynamic>;
         if (loadingUnitMap['id'] == 1) {
           continue; // Skip base unit

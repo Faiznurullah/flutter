@@ -43,8 +43,7 @@ const Color _kDefaultNavBarBorderColor = Color(0x4D000000);
 const Border _kDefaultNavBarBorder = Border(
   bottom: BorderSide(
     color: _kDefaultNavBarBorderColor,
-    width: 0.0, // One physical pixel.
-    style: BorderStyle.solid,
+    width: 0.0, // 0.0 means one physical pixel
   ),
 );
 
@@ -75,8 +74,51 @@ class _HeroTag {
   }
 
   @override
-  int get hashCode {
-    return identityHashCode(navigator);
+  int get hashCode => identityHashCode(navigator);
+}
+
+// An `AnimatedWidget` that imposes a fixed size on its child widget, and
+// shifts the child widget in the parent stack, driven by its `offsetAnimation`
+// property.
+class _FixedSizeSlidingTransition extends AnimatedWidget {
+  const _FixedSizeSlidingTransition({
+    required this.isLTR,
+    required this.offsetAnimation,
+    required this.size,
+    required this.child,
+  }) : super(listenable: offsetAnimation);
+
+  // Whether the writing direction used in the navigation bar transition is
+  // left-to-right.
+  final bool isLTR;
+
+  // The fixed size to impose on `child`.
+  final Size size;
+
+  // The animated offset from the top-leading corner of the stack.
+  //
+  // When `isLTR` is true, the `Offset` is the position of the child widget in
+  // the stack render box's regular coordinate space.
+  //
+  // When `isLTR` is false, the coordinate system is flipped around the
+  // horizontal axis and the origin is set to the top right corner of the render
+  // boxes. In other words, this parameter describes the offset from the top
+  // right corner of the stack, to the top right corner of the child widget, and
+  // the x-axis runs right to left.
+  final Animation<Offset> offsetAnimation;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: offsetAnimation.value.dy,
+      left: isLTR ? offsetAnimation.value.dx : null,
+      right: isLTR ? null : offsetAnimation.value.dx,
+      width: size.width,
+      height: size.height,
+      child: child,
+    );
   }
 }
 
@@ -107,7 +149,6 @@ Widget _wrapWithBackground({
     }
     result = AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
-      sized: true,
       child: result,
     );
   }
@@ -119,8 +160,9 @@ Widget _wrapWithBackground({
     child: result,
   );
 
-  if (backgroundColor.alpha == 0xFF)
+  if (backgroundColor.alpha == 0xFF) {
     return childWithBackground;
+  }
 
   return ClipRect(
     child: BackdropFilter(
@@ -182,32 +224,12 @@ bool _isTransitionable(BuildContext context) {
 /// value from the operating system can be retrieved in many ways, such as querying
 /// [MediaQuery.textScaleFactorOf] against [CupertinoApp]'s [BuildContext].
 ///
-/// {@tool dartpad --template=stateful_widget_cupertino}
+/// {@tool dartpad}
 /// This example shows a [CupertinoNavigationBar] placed in a [CupertinoPageScaffold].
 /// Since [backgroundColor]'s opacity is not 1.0, there is a blur effect and
 /// content slides underneath.
 ///
-///
-/// ```dart
-/// @override
-/// Widget build(BuildContext context) {
-///   return CupertinoPageScaffold(
-///     navigationBar: CupertinoNavigationBar(
-///       // Try removing opacity to observe the lack of a blur effect and of sliding content.
-///       backgroundColor: CupertinoColors.systemGrey.withOpacity(0.5),
-///       middle: const Text('Sample Code'),
-///     ),
-///     child: Column(
-///       children: <Widget>[
-///         Container(height: 50, color: CupertinoColors.systemRed),
-///         Container(height: 50, color: CupertinoColors.systemGreen),
-///         Container(height: 50, color: CupertinoColors.systemBlue),
-///         Container(height: 50, color: CupertinoColors.systemYellow),
-///       ],
-///     ),
-///   );
-/// }
-/// ```
+/// ** See code in examples/api/lib/cupertino/nav_bar/cupertino_navigation_bar.0.dart **
 /// {@end-tool}
 ///
 /// See also:
@@ -216,10 +238,11 @@ bool _isTransitionable(BuildContext context) {
 ///    [CupertinoNavigationBar].
 ///  * [CupertinoSliverNavigationBar] for a navigation bar to be placed in a
 ///    scrolling list and that supports iOS-11-style large titles.
+///  * <https://developer.apple.com/design/human-interface-guidelines/ios/bars/navigation-bars/>
 class CupertinoNavigationBar extends StatefulWidget implements ObstructingPreferredSizeWidget {
   /// Creates a navigation bar in the iOS style.
   const CupertinoNavigationBar({
-    Key? key,
+    super.key,
     this.leading,
     this.automaticallyImplyLeading = true,
     this.automaticallyImplyMiddle = true,
@@ -244,8 +267,7 @@ class CupertinoNavigationBar extends StatefulWidget implements ObstructingPrefer
          !transitionBetweenRoutes || identical(heroTag, _defaultHeroTag),
          'Cannot specify a heroTag override if this navigation bar does not '
          'transition due to transitionBetweenRoutes = false.',
-       ),
-       super(key: key);
+       );
 
   /// {@template flutter.cupertino.CupertinoNavigationBar.leading}
   /// Widget to place at the start of the navigation bar. Normally a back button
@@ -529,10 +551,10 @@ class _CupertinoNavigationBarState extends State<CupertinoNavigationBar> {
 /// Use [transitionBetweenRoutes] or [heroTag] to customize the transition
 /// behavior for multiple navigation bars per route.
 ///
-/// `CupertinoSliverNavigationBar` has its text scale factor set to 1.0 by default
+/// [CupertinoSliverNavigationBar] has its text scale factor set to 1.0 by default
 /// and does not respond to text scale factor changes from the operating system,
 /// to match the native iOS behavior. To override this behavior, wrap each of the
-/// `CupertinoSliverNavigationBar`'s components inside a [MediaQuery] with the
+/// [CupertinoSliverNavigationBar]'s components inside a [MediaQuery] with the
 /// desired [MediaQueryData.textScaleFactor] value. The text scale factor value
 /// from the operating system can be retrieved in many ways, such as querying
 /// [MediaQuery.textScaleFactorOf] against [CupertinoApp]'s [BuildContext].
@@ -542,20 +564,29 @@ class _CupertinoNavigationBarState extends State<CupertinoNavigationBar> {
 /// user scrolls, but it will also stretch when the user over-scrolls if the
 /// [stretch] value is `true`. Defaults to `false`.
 ///
+/// {@tool dartpad}
+/// This example shows [CupertinoSliverNavigationBar] in action inside a [CustomScrollView].
+///
+/// ** See code in examples/api/lib/cupertino/nav_bar/cupertino_sliver_nav_bar.0.dart **
+/// {@end-tool}
+///
 /// See also:
 ///
 ///  * [CupertinoNavigationBar], an iOS navigation bar for use on non-scrolling
 ///    pages.
+///  * [CustomScrollView], a ScrollView that creates custom scroll effects using slivers.
+///  * <https://developer.apple.com/design/human-interface-guidelines/ios/bars/navigation-bars/>
 class CupertinoSliverNavigationBar extends StatefulWidget {
   /// Creates a navigation bar for scrolling lists.
   ///
   /// The [largeTitle] argument is required and must not be null.
   const CupertinoSliverNavigationBar({
-    Key? key,
+    super.key,
     this.largeTitle,
     this.leading,
     this.automaticallyImplyLeading = true,
     this.automaticallyImplyTitle = true,
+    this.alwaysShowMiddle = true,
     this.previousPageTitle,
     this.middle,
     this.trailing,
@@ -573,8 +604,7 @@ class CupertinoSliverNavigationBar extends StatefulWidget {
          'No largeTitle has been provided but automaticallyImplyTitle is also '
          'false. Either provide a largeTitle or set automaticallyImplyTitle to '
          'true.',
-       ),
-       super(key: key);
+       );
 
   /// The navigation bar's title.
   ///
@@ -616,13 +646,25 @@ class CupertinoSliverNavigationBar extends StatefulWidget {
   /// This value cannot be null.
   final bool automaticallyImplyTitle;
 
+  /// Controls whether [middle] widget should always be visible (even in
+  /// expanded state).
+  ///
+  /// If true (default) and [middle] is not null, [middle] widget is always
+  /// visible. If false, [middle] widget is visible only in collapsed state if
+  /// it is provided.
+  ///
+  /// This should be set to false if you only want to show [largeTitle] in
+  /// expanded state and [middle] in collapsed state.
+  final bool alwaysShowMiddle;
+
   /// {@macro flutter.cupertino.CupertinoNavigationBar.previousPageTitle}
   final String? previousPageTitle;
 
   /// A widget to place in the middle of the static navigation bar instead of
   /// the [largeTitle].
   ///
-  /// This widget is visible in both collapsed and expanded states. The text
+  /// This widget is visible in both collapsed and expanded states if
+  /// [alwaysShowMiddle] is true, otherwise just in collapsed state. The text
   /// supplied in [largeTitle] will no longer appear in collapsed state if a
   /// [middle] widget is provided.
   final Widget? middle;
@@ -713,7 +755,7 @@ class _CupertinoSliverNavigationBarState extends State<CupertinoSliverNavigation
           transitionBetweenRoutes: widget.transitionBetweenRoutes,
           heroTag: widget.heroTag,
           persistentHeight: _kNavBarPersistentHeight + MediaQuery.of(context).padding.top,
-          alwaysShowMiddle: widget.middle != null,
+          alwaysShowMiddle: widget.alwaysShowMiddle && widget.middle != null,
           stretchConfiguration: widget.stretch ? OverScrollHeaderStretchConfiguration() : null,
         ),
       ),
@@ -886,11 +928,10 @@ class _LargeTitleNavigationBarSliverDelegate
 /// doesn't scroll.
 class _PersistentNavigationBar extends StatelessWidget {
   const _PersistentNavigationBar({
-    Key? key,
     required this.components,
     this.padding,
     this.middleVisible,
-  }) : super(key: key);
+  });
 
   final _NavigationBarStaticComponents components;
 
@@ -934,7 +975,6 @@ class _PersistentNavigationBar extends StatelessWidget {
       leading: leading,
       middle: middle,
       trailing: components.trailing,
-      centerMiddle: true,
       middleSpacing: 6.0,
     );
 
@@ -1259,13 +1299,12 @@ class CupertinoNavigationBarBackButton extends StatelessWidget {
   ///
   /// The [color] parameter must not be null.
   const CupertinoNavigationBarBackButton({
-    Key? key,
+    super.key,
     this.color,
     this.previousPageTitle,
     this.onPressed,
   }) : _backChevron = null,
-       _backLabel = null,
-       super(key: key);
+       _backLabel = null;
 
   // Allow the back chevron and label to be separately created (and keyed)
   // because they animate separately during page transitions.
@@ -1307,7 +1346,7 @@ class CupertinoNavigationBarBackButton extends StatelessWidget {
     final ModalRoute<dynamic>? currentRoute = ModalRoute.of(context);
     if (onPressed == null) {
       assert(
-        currentRoute?.canPop == true,
+        currentRoute?.canPop ?? false,
         'CupertinoNavigationBarBackButton should only be used in routes that can be popped',
       );
     }
@@ -1330,7 +1369,6 @@ class CupertinoNavigationBarBackButton extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: _kNavBarBackButtonTapWidth),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
               children: <Widget>[
                 const Padding(padding: EdgeInsetsDirectional.only(start: 8.0)),
                 _backChevron ?? const _BackChevron(),
@@ -1359,7 +1397,7 @@ class CupertinoNavigationBarBackButton extends StatelessWidget {
 
 
 class _BackChevron extends StatelessWidget {
-  const _BackChevron({ Key? key }) : super(key: key);
+  const _BackChevron();
 
   @override
   Widget build(BuildContext context) {
@@ -1404,10 +1442,9 @@ class _BackChevron extends StatelessWidget {
 /// is true.
 class _BackLabel extends StatelessWidget {
   const _BackLabel({
-    Key? key,
     required this.specifiedPreviousTitle,
     required this.route,
-  }) : super(key: key);
+  });
 
   final String? specifiedPreviousTitle;
   final ModalRoute<dynamic>? route;
@@ -1729,49 +1766,74 @@ class _NavigationBarComponentsTransition {
     );
   }
 
-  // Create a Tween that moves a widget between its original position in its
-  // ancestor navigation bar to another widget's position in that widget's
-  // navigation bar.
+  // Create an animated widget that moves the given child widget between its
+  // original position in its ancestor navigation bar to another widget's
+  // position in that widget's navigation bar.
   //
   // Anchor their positions based on the vertical middle of their respective
   // render boxes' leading edge.
   //
-  // Also produce RelativeRects with sizes that would preserve the constant
-  // BoxConstraints of the 'from' widget so that animating font sizes etc don't
-  // produce rounding error artifacts with a linearly resizing rect.
-  RelativeRectTween slideFromLeadingEdge({
+  // This method assumes there's no other transforms other than translations
+  // when converting a rect from the original navigation bar's coordinate space
+  // to the other navigation bar's coordinate space, to avoid performing
+  // floating point operations on the size of the child widget, so that the
+  // incoming constraints used for sizing the child widget will be exactly the
+  // same.
+  _FixedSizeSlidingTransition slideFromLeadingEdge({
     required GlobalKey fromKey,
     required RenderBox fromNavBarBox,
     required GlobalKey toKey,
     required RenderBox toNavBarBox,
+    required Widget child,
   }) {
-    final RelativeRect fromRect = positionInTransitionBox(fromKey, from: fromNavBarBox);
-
     final RenderBox fromBox = fromKey.currentContext!.findRenderObject()! as RenderBox;
     final RenderBox toBox = toKey.currentContext!.findRenderObject()! as RenderBox;
 
-    // We move a box with the size of the 'from' render object such that its
-    // upper left corner is at the upper left corner of the 'to' render object.
-    // With slight y axis adjustment for those render objects' height differences.
-    Rect toRect =
-        toBox.localToGlobal(
-          Offset.zero,
-          ancestor: toNavBarBox,
-        ).translate(
-          0.0,
-          - fromBox.size.height / 2 + toBox.size.height / 2,
-        ) & fromBox.size; // Keep the from render object's size.
+    final bool isLTR = forwardDirection > 0;
 
-    if (forwardDirection < 0) {
-      // If RTL, move the center right to the center right instead of matching
-      // the center lefts.
-      toRect = toRect.translate(- fromBox.size.width + toBox.size.width, 0.0);
-    }
+    // The animation moves the fromBox so its anchor (left-center or right-center
+    // depending on the writing direction) aligns with toBox's anchor.
+    final Offset fromAnchorLocal = Offset(
+      isLTR ? 0 : fromBox.size.width,
+      fromBox.size.height / 2,
+    );
+    final Offset toAnchorLocal = Offset(
+      isLTR ? 0 : toBox.size.width,
+      toBox.size.height / 2,
+    );
+    final Offset fromAnchorInFromBox = fromBox.localToGlobal(fromAnchorLocal, ancestor: fromNavBarBox);
+    final Offset toAnchorInToBox = toBox.localToGlobal(toAnchorLocal, ancestor: toNavBarBox);
 
-    return RelativeRectTween(
-        begin: fromRect,
-        end: RelativeRect.fromRect(toRect, transitionBox),
-      );
+    // We can't get ahold of the render box of the stack (i.e., `transitionBox`)
+    // we place components on yet, but we know the stack needs to be top-leading
+    // aligned with both fromNavBarBox and toNavBarBox to make the transition
+    // look smooth. Also use the top-leading point as the origin for ease of
+    // calculation.
+
+    // The offset to move fromAnchor to toAnchor, in transitionBox's top-leading
+    // coordinates.
+    final Offset translation = isLTR
+      ? toAnchorInToBox - fromAnchorInFromBox
+      : Offset(toNavBarBox.size.width - toAnchorInToBox.dx, toAnchorInToBox.dy)
+      - Offset(fromNavBarBox.size.width - fromAnchorInFromBox.dx, fromAnchorInFromBox.dy);
+
+    final RelativeRect fromBoxMargin = positionInTransitionBox(fromKey, from: fromNavBarBox);
+    final Offset fromOriginInTransitionBox = Offset(
+      isLTR ? fromBoxMargin.left : fromBoxMargin.right,
+      fromBoxMargin.top,
+    );
+
+    final Tween<Offset> anchorMovementInTransitionBox = Tween<Offset>(
+      begin: fromOriginInTransitionBox,
+      end: fromOriginInTransitionBox + translation,
+    );
+
+    return _FixedSizeSlidingTransition(
+      isLTR: isLTR,
+      offsetAnimation: animation.drive(anchorMovementInTransitionBox),
+      size: fromBox.size,
+      child: child,
+    );
   }
 
   Animation<double> fadeInFrom(double t, { Curve curve = Curves.easeIn }) {
@@ -1866,13 +1928,11 @@ class _NavigationBarComponentsTransition {
 
     if (bottomMiddle != null && topBackLabel != null) {
       // Move from current position to the top page's back label position.
-      return PositionedTransition(
-        rect: animation.drive(slideFromLeadingEdge(
-          fromKey: bottomComponents.middleKey,
-          fromNavBarBox: bottomNavBarBox,
-          toKey: topComponents.backLabelKey,
-          toNavBarBox: topNavBarBox,
-        )),
+      return slideFromLeadingEdge(
+        fromKey: bottomComponents.middleKey,
+        fromNavBarBox: bottomNavBarBox,
+        toKey: topComponents.backLabelKey,
+        toNavBarBox: topNavBarBox,
         child: FadeTransition(
           // A custom middle widget like a segmented control fades away faster.
           opacity: fadeOutBy(bottomHasUserMiddle ? 0.4 : 0.7),
@@ -1923,13 +1983,11 @@ class _NavigationBarComponentsTransition {
 
     if (bottomLargeTitle != null && topBackLabel != null) {
       // Move from current position to the top page's back label position.
-      return PositionedTransition(
-        rect: animation.drive(slideFromLeadingEdge(
-          fromKey: bottomComponents.largeTitleKey,
-          fromNavBarBox: bottomNavBarBox,
-          toKey: topComponents.backLabelKey,
-          toNavBarBox: topNavBarBox,
-        )),
+      return slideFromLeadingEdge(
+        fromKey: bottomComponents.largeTitleKey,
+        fromNavBarBox: bottomNavBarBox,
+        toKey: topComponents.backLabelKey,
+        toNavBarBox: topNavBarBox,
         child: FadeTransition(
           opacity: fadeOutBy(0.6),
           child: Align(
@@ -2083,13 +2141,11 @@ class _NavigationBarComponentsTransition {
     if (bottomLargeTitle != null &&
         topBackLabel != null &&
         bottomLargeExpanded) {
-      return PositionedTransition(
-        rect: animation.drive(slideFromLeadingEdge(
-          fromKey: bottomComponents.largeTitleKey,
-          fromNavBarBox: bottomNavBarBox,
-          toKey: topComponents.backLabelKey,
-          toNavBarBox: topNavBarBox,
-        )),
+      return slideFromLeadingEdge(
+        fromKey: bottomComponents.largeTitleKey,
+        fromNavBarBox: bottomNavBarBox,
+        toKey: topComponents.backLabelKey,
+        toNavBarBox: topNavBarBox,
         child: FadeTransition(
           opacity: midClickOpacity ?? fadeInFrom(0.4),
           child: DefaultTextStyleTransition(
@@ -2108,13 +2164,11 @@ class _NavigationBarComponentsTransition {
     // The topBackLabel always comes from the large title first if available
     // and expanded instead of middle.
     if (bottomMiddle != null && topBackLabel != null) {
-      return PositionedTransition(
-        rect: animation.drive(slideFromLeadingEdge(
-          fromKey: bottomComponents.middleKey,
-          fromNavBarBox: bottomNavBarBox,
-          toKey: topComponents.backLabelKey,
-          toNavBarBox: topNavBarBox,
-        )),
+      return slideFromLeadingEdge(
+        fromKey: bottomComponents.middleKey,
+        fromNavBarBox: bottomNavBarBox,
+        toKey: topComponents.backLabelKey,
+        toNavBarBox: topNavBarBox,
         child: FadeTransition(
           opacity: midClickOpacity ?? fadeInFrom(0.3),
           child: DefaultTextStyleTransition(
@@ -2145,20 +2199,32 @@ class _NavigationBarComponentsTransition {
     }
 
     final RelativeRect to = positionInTransitionBox(topComponents.middleKey, from: topNavBarBox);
+    final RenderBox toBox = topComponents.middleKey.currentContext!.findRenderObject()! as RenderBox;
 
-    // Shift in from the trailing edge of the screen.
-    final RelativeRectTween positionTween = RelativeRectTween(
-      begin: to.shift(
-        Offset(
-          forwardDirection * topNavBarBox.size.width / 2.0,
-          0.0,
-        ),
-      ),
-      end: to,
+    final bool isLTR = forwardDirection > 0;
+
+    // Anchor is the top-leading point of toBox, in transition box's top-leading
+    // coordinate space.
+    final Offset toAnchorInTransitionBox = Offset(
+      isLTR ? to.left : to.right,
+      to.top,
     );
 
-    return PositionedTransition(
-      rect: animation.drive(positionTween),
+    // Shift in from the trailing edge of the screen.
+    final Tween<Offset> anchorMovementInTransitionBox = Tween<Offset>(
+      begin: Offset(
+        // the "width / 2" here makes the middle widget's horizontal center on
+        // the trailing edge of the top nav bar.
+        topNavBarBox.size.width - toBox.size.width / 2,
+        to.top,
+      ),
+      end: toAnchorInTransitionBox,
+    );
+
+    return _FixedSizeSlidingTransition(
+      isLTR: isLTR,
+      offsetAnimation: animation.drive(anchorMovementInTransitionBox),
+      size: toBox.size,
       child: FadeTransition(
         opacity: fadeInFrom(0.25),
         child: DefaultTextStyle(

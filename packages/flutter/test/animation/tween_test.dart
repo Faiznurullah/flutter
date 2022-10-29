@@ -14,22 +14,18 @@ void main() {
       end: Object(),
     );
 
-    FlutterError? error;
-    try {
-      objectTween.transform(0.1);
-    } on FlutterError catch (err) {
-      error = err;
-    }
-
-    if (error == null) {
-      fail('Expected Tween.transform to throw a FlutterError');
-    }
-
-    expect(error.diagnostics.map((DiagnosticsNode node) => node.toString()), <String>[
-      'Cannot lerp between "Instance of \'Object\'" and "Instance of \'Object\'".',
-      'The type Object might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
-      'There may be a dedicated "ObjectTween" for this type, or you may need to create one.',
-    ]);
+    expect(
+      () => objectTween.transform(0.1),
+      throwsA(isA<FlutterError>().having(
+        (FlutterError error) => error.diagnostics.map((DiagnosticsNode node) => node.toString()),
+        'diagnostics',
+        <String>[
+          'Cannot lerp between "Instance of \'Object\'" and "Instance of \'Object\'".',
+          'The type Object might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
+          'There may be a dedicated "ObjectTween" for this type, or you may need to create one.',
+        ],
+      )),
+    );
   });
 
   test('throws flutter error when tweening types that do not fully satisfy tween requirements - Color', () {
@@ -38,22 +34,18 @@ void main() {
       end: const Color(0xFFFFFFFF),
     );
 
-    FlutterError? error;
-    try {
-      colorTween.transform(0.1);
-    } on FlutterError catch (err) {
-      error = err;
-    }
-
-    if (error == null) {
-      fail('Expected Tween.transform to throw a FlutterError');
-    }
-
-    expect(error.diagnostics.map((DiagnosticsNode node) => node.toString()), <String>[
-      'Cannot lerp between "Color(0xff000000)" and "Color(0xffffffff)".',
-      'The type Color might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
-      'To lerp colors, consider ColorTween instead.',
-    ]);
+    expect(
+      () => colorTween.transform(0.1),
+      throwsA(isA<FlutterError>().having(
+        (FlutterError error) => error.diagnostics.map((DiagnosticsNode node) => node.toString()),
+        'diagnostics',
+        <String>[
+          'Cannot lerp between "Color(0xff000000)" and "Color(0xffffffff)".',
+          'The type Color might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
+          'To lerp colors, consider ColorTween instead.',
+        ],
+      )),
+    );
   });
 
   test('throws flutter error when tweening types that do not fully satisfy tween requirements - Rect', () {
@@ -62,22 +54,18 @@ void main() {
       end: const Rect.fromLTWH(2, 2, 2, 2),
     );
 
-    FlutterError? error;
-    try {
-      rectTween.transform(0.1);
-    } on FlutterError catch (err) {
-      error = err;
-    }
-
-    if (error == null) {
-      fail('Expected Tween.transform to throw a FlutterError');
-    }
-
-    expect(error.diagnostics.map((DiagnosticsNode node) => node.toString()), <String>[
-      'Cannot lerp between "Rect.fromLTRB(0.0, 0.0, 10.0, 10.0)" and "Rect.fromLTRB(2.0, 2.0, 4.0, 4.0)".',
-      'The type Rect might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
-      'To lerp rects, consider RectTween instead.',
-    ]);
+    expect(
+      () => rectTween.transform(0.1),
+      throwsA(isA<FlutterError>().having(
+        (FlutterError error) => error.diagnostics.map((DiagnosticsNode node) => node.toString()),
+        'diagnostics',
+        <String>[
+          'Cannot lerp between "Rect.fromLTRB(0.0, 0.0, 10.0, 10.0)" and "Rect.fromLTRB(2.0, 2.0, 4.0, 4.0)".',
+          'The type Rect might not fully implement `+`, `-`, and/or `*`. $kApiDocsLink',
+          'To lerp rects, consider RectTween instead.',
+        ],
+      )),
+    );
   });
 
   test('throws flutter error when tweening types that do not fully satisfy tween requirements - int', () {
@@ -86,22 +74,18 @@ void main() {
       end: 1,
     );
 
-    FlutterError? error;
-    try {
-      colorTween.transform(0.1);
-    } on FlutterError catch (err) {
-      error = err;
-    }
-
-    if (error == null) {
-      fail('Expected Tween.transform to throw a FlutterError');
-    }
-
-    expect(error.diagnostics.map((DiagnosticsNode node) => node.toString()), <String>[
-      'Cannot lerp between "0" and "1".',
-      'The type int returned a double after multiplication with a double value. $kApiDocsLink',
-      'To lerp int values, consider IntTween or StepTween instead.',
-    ]);
+    expect(
+      () => colorTween.transform(0.1),
+      throwsA(isA<FlutterError>().having(
+        (FlutterError error) => error.diagnostics.map((DiagnosticsNode node) => node.toString()),
+        'diagnostics',
+        <String>[
+          'Cannot lerp between "0" and "1".',
+          'The type int returned a double after multiplication with a double value. $kApiDocsLink',
+          'To lerp int values, consider IntTween or StepTween instead.',
+        ],
+      )),
+    );
   });
 
   test('Can chain tweens', () {
@@ -141,13 +125,13 @@ void main() {
 
   test('BorderTween nullable test', () {
     BorderTween tween = BorderTween();
-    expect(tween.lerp(0.0),  null);
-    expect(tween.lerp(1.0),  null);
+    expect(tween.lerp(0.0), null);
+    expect(tween.lerp(1.0), null);
 
-    tween = BorderTween(begin: null, end: const Border(top: BorderSide()));
-    expect(tween.lerp(0.0),  const Border());
-    expect(tween.lerp(0.5),  const Border(top: BorderSide(width: 0.5)));
-    expect(tween.lerp(1.0),  const Border(top: BorderSide()));
+    tween = BorderTween(end: const Border(top: BorderSide()));
+    expect(tween.lerp(0.0), const Border());
+    expect(tween.lerp(0.5), const Border(top: BorderSide(width: 0.5)));
+    expect(tween.lerp(1.0), const Border(top: BorderSide()));
   });
 
   test('SizeTween', () {
@@ -172,13 +156,13 @@ void main() {
 
   test('Matrix4Tween', () {
     final Matrix4 a = Matrix4.identity();
-    final Matrix4 b = a.clone()..translate(6.0, -8.0, 0.0)..scale(0.5, 1.0, 5.0);
+    final Matrix4 b = a.clone()..translate(6.0, -8.0)..scale(0.5, 1.0, 5.0);
     final Matrix4Tween tween = Matrix4Tween(begin: a, end: b);
     expect(tween.lerp(0.0), equals(a));
     expect(tween.lerp(1.0), equals(b));
     expect(
       tween.lerp(0.5),
-      equals(a.clone()..translate(3.0, -4.0, 0.0)..scale(0.75, 1.0, 3.0)),
+      equals(a.clone()..translate(3.0, -4.0)..scale(0.75, 1.0, 3.0)),
     );
     final Matrix4 c = a.clone()..rotateZ(1.0);
     final Matrix4Tween rotationTween = Matrix4Tween(begin: a, end: c);
@@ -188,7 +172,7 @@ void main() {
       rotationTween.lerp(0.5).absoluteError(a.clone()..rotateZ(0.5)),
       moreOrLessEquals(0.0),
     );
-  }, skip: isWindows); // floating point math not quite deterministic on Windows?
+  });
 
   test('ConstantTween', () {
     final ConstantTween<double> tween = ConstantTween<double>(100.0);
@@ -230,7 +214,7 @@ void main() {
   });
 
   test('BorderRadiusTween nullable test', () {
-    final BorderRadiusTween tween = BorderRadiusTween(begin: null, end: null);
+    final BorderRadiusTween tween = BorderRadiusTween();
     expect(tween.transform(0.0), null);
     expect(tween.transform(1.0), null);
     expect(tween.lerp(0.0), null);

@@ -23,7 +23,7 @@ class MainActivity: FlutterActivity() {
         } }
         val basicStandard = BasicMessageChannel(flutterEngine.dartExecutor, "dev.flutter.echo.basic.standard", StandardMessageCodec.INSTANCE)
         basicStandard.setMessageHandler { message, reply -> reply.reply(message) }
-        val basicBinary = BasicMessageChannel(flutterEngine.dartExecutor, "dev.flutter.echo.basic.binary", BinaryCodec.INSTANCE)
+        val basicBinary = BasicMessageChannel(flutterEngine.dartExecutor, "dev.flutter.echo.basic.binary", BinaryCodec.INSTANCE_DIRECT)
         basicBinary.setMessageHandler { message, reply -> run {
             if (byteBufferCache == null) {
                 byteBufferCache = ByteBuffer.allocateDirect(message!!.capacity())
@@ -31,6 +31,9 @@ class MainActivity: FlutterActivity() {
             }
             reply.reply(byteBufferCache)
         } }
+        val taskQueue = flutterEngine.dartExecutor.getBinaryMessenger().makeBackgroundTaskQueue();
+        val backgroundStandard = BasicMessageChannel(flutterEngine.dartExecutor, "dev.flutter.echo.background.standard", StandardMessageCodec.INSTANCE, taskQueue)
+        backgroundStandard.setMessageHandler { message, reply -> reply.reply(message) }
         super.configureFlutterEngine(flutterEngine)
     }
 }

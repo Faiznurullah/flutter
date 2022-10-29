@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(gspencergoog): Remove this tag once this test's state leaks/test
+// dependencies have been fixed.
+// https://github.com/flutter/flutter/issues/85160
+// Fails with "flutter test --test-randomize-ordering-seed=20210826"
+@Tags(<String>['no-shuffle'])
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,14 +20,14 @@ void main() {
     test('can send string message and get reply', () async {
       TestDefaultBinaryMessengerBinding.instance!.defaultBinaryMessenger.setMockMessageHandler(
         'ch',
-        (ByteData? message) async => string.encodeMessage(string.decodeMessage(message)! + ' world'),
+        (ByteData? message) async => string.encodeMessage('${string.decodeMessage(message)!} world'),
       );
       final String? reply = await channel.send('hello');
       expect(reply, equals('hello world'));
     });
 
     test('can receive string message and send reply', () async {
-      channel.setMessageHandler((String? message) async => message! + ' world');
+      channel.setMessageHandler((String? message) async => '${message!} world');
       String? reply;
       await TestDefaultBinaryMessengerBinding.instance!.defaultBinaryMessenger.handlePlatformMessage(
         'ch',
@@ -128,16 +134,15 @@ void main() {
           ]);
         },
       );
-      try {
-        await channel.invokeMethod<dynamic>('sayHello', 'hello');
-        fail('Exception expected');
-      } on PlatformException catch (e) {
-        expect(e.code, equals('bad'));
-        expect(e.message, equals('Something happened'));
-        expect(e.details, equals(<String, dynamic>{'a': 42, 'b': 3.14}));
-      } catch (e) {
-        fail('PlatformException expected');
-      }
+      expect(
+        () => channel.invokeMethod<dynamic>('sayHello', 'hello'),
+        throwsA(
+          isA<PlatformException>()
+            .having((PlatformException e) => e.code, 'code', equals('bad'))
+            .having((PlatformException e) => e.message, 'message', equals('Something happened'))
+            .having((PlatformException e) => e.details, 'details', equals(<String, dynamic>{'a': 42, 'b': 3.14})),
+        ),
+      );
     });
 
     test('can invoke unimplemented method', () async {
@@ -145,15 +150,16 @@ void main() {
         'ch7',
         (ByteData? message) async => null,
       );
-      try {
-        await channel.invokeMethod<void>('sayHello', 'hello');
-        fail('Exception expected');
-      } on MissingPluginException catch (e) {
-        expect(e.message, contains('sayHello'));
-        expect(e.message, contains('ch7'));
-      } catch (e) {
-        fail('MissingPluginException expected');
-      }
+      expect(
+        () => channel.invokeMethod<void>('sayHello', 'hello'),
+        throwsA(
+          isA<MissingPluginException>()
+            .having((MissingPluginException e) => e.message, 'message', allOf(
+              contains('sayHello'),
+              contains('ch7'),
+            )),
+        ),
+      );
     });
 
     test('can invoke unimplemented method (optional)', () async {
@@ -211,22 +217,22 @@ void main() {
 
     test('can handle method call with expressive error result', () async {
       channel.setMethodCallHandler((MethodCall call) async {
-        throw PlatformException(code: 'bad', message: 'sayHello failed', details: null);
+        throw PlatformException(code: 'bad', message: 'sayHello failed');
       });
       final ByteData call = jsonMethod.encodeMethodCall(const MethodCall('sayHello', 'hello'));
       ByteData? envelope;
       await TestDefaultBinaryMessengerBinding.instance!.defaultBinaryMessenger.handlePlatformMessage('ch7', call, (ByteData? result) {
         envelope = result;
       });
-      try {
-        jsonMethod.decodeEnvelope(envelope!);
-        fail('Exception expected');
-      } on PlatformException catch (e) {
-        expect(e.code, equals('bad'));
-        expect(e.message, equals('sayHello failed'));
-      } catch (e) {
-        fail('PlatformException expected');
-      }
+      expect(
+        () => jsonMethod.decodeEnvelope(envelope!),
+        throwsA(
+          isA<PlatformException>()
+            .having((PlatformException e) => e.code, 'code', equals('bad'))
+            .having((PlatformException e) => e.message, 'message', equals('sayHello failed')),
+        ),
+      );
+      channel.setMethodCallHandler(null);
     });
 
     test('can handle method call with other error result', () async {
@@ -238,19 +244,19 @@ void main() {
       await TestDefaultBinaryMessengerBinding.instance!.defaultBinaryMessenger.handlePlatformMessage('ch7', call, (ByteData? result) {
         envelope = result;
       });
-      try {
-        jsonMethod.decodeEnvelope(envelope!);
-        fail('Exception expected');
-      } on PlatformException catch (e) {
-        expect(e.code, equals('error'));
-        expect(e.message, equals('Invalid argument(s): bad'));
-      } catch (e) {
-        fail('PlatformException expected');
-      }
+      expect(
+        () => jsonMethod.decodeEnvelope(envelope!),
+        throwsA(
+          isA<PlatformException>()
+            .having((PlatformException e) => e.code, 'code', equals('error'))
+            .having((PlatformException e) => e.message, 'message', equals('Invalid argument(s): bad')),
+        ),
+      );
+      channel.setMethodCallHandler(null);
     });
 
     test('can check the mock handler', () async {
-      Future<dynamic> handler(MethodCall call) => Future<dynamic>.value(null);
+      Future<dynamic> handler(MethodCall call) => Future<dynamic>.value();
 
       const MethodChannel channel = MethodChannel('test_handler');
       expect(TestDefaultBinaryMessengerBinding.instance!.defaultBinaryMessenger.checkMockMessageHandler(channel.name, null), true);
@@ -279,8 +285,8 @@ void main() {
           final Map<dynamic, dynamic> methodCall = jsonMessage.decodeMessage(message) as Map<dynamic, dynamic>;
           if (methodCall['method'] == 'listen') {
             final String argument = methodCall['args'] as String;
-            emitEvent(jsonMethod.encodeSuccessEnvelope(argument + '1'));
-            emitEvent(jsonMethod.encodeSuccessEnvelope(argument + '2'));
+            emitEvent(jsonMethod.encodeSuccessEnvelope('${argument}1'));
+            emitEvent(jsonMethod.encodeSuccessEnvelope('${argument}2'));
             emitEvent(null);
             return jsonMethod.encodeSuccessEnvelope(null);
           } else if (methodCall['method'] == 'cancel') {

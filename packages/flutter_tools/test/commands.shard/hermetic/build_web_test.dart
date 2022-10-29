@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'package:args/command_runner.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
@@ -14,9 +12,7 @@ import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/commands/build.dart';
 import 'package:flutter_tools/src/commands/build_web.dart';
 import 'package:flutter_tools/src/features.dart';
-import 'package:flutter_tools/src/project.dart';
 import 'package:flutter_tools/src/runner/flutter_command.dart';
-import 'package:flutter_tools/src/web/compile.dart';
 
 import '../../src/common.dart';
 import '../../src/context.dart';
@@ -25,12 +21,11 @@ import '../../src/test_build_system.dart';
 import '../../src/test_flutter_command_runner.dart';
 
 void main() {
-  FileSystem fileSystem;
+  late FileSystem fileSystem;
   final Platform fakePlatform = FakePlatform(
-    operatingSystem: 'linux',
     environment: <String, String>{
-      'FLUTTER_ROOT': '/'
-    }
+      'FLUTTER_ROOT': '/',
+    },
   );
 
   setUpAll(() {
@@ -50,18 +45,12 @@ void main() {
 
   testUsingContext('Refuses to build for web when missing index.html', () async {
     fileSystem.file(fileSystem.path.join('web', 'index.html')).deleteSync();
-    final FlutterProject project = FlutterProject.fromDirectoryTest(fileSystem.currentDirectory);
+    final CommandRunner<void> runner = createTestCommandRunner(BuildCommand());
 
-    expect(buildWeb(
-      project,
-      fileSystem.path.join('lib', 'main.dart'),
-      BuildInfo.debug,
-      false,
-      null,
-      true,
-      true,
-      null,
-    ), throwsToolExit());
+    expect(
+      () => runner.run(<String>['build', 'web', '--no-pub']),
+      throwsToolExit(message: 'Missing index.html.')
+    );
   }, overrides: <Type, Generator>{
     Platform: () => fakePlatform,
     FileSystem: () => fileSystem,
@@ -91,7 +80,7 @@ void main() {
   }, overrides: <Type, Generator>{
     Platform: () => fakePlatform,
     FileSystem: () => fileSystem,
-    FeatureFlags: () => TestFeatureFlags(isWebEnabled: false),
+    FeatureFlags: () => TestFeatureFlags(),
     ProcessManager: () => FakeProcessManager.any(),
   });
 
@@ -99,9 +88,11 @@ void main() {
     final BuildCommand buildCommand = BuildCommand();
     final CommandRunner<void> runner = createTestCommandRunner(buildCommand);
     setupFileSystemForEndToEndTest(fileSystem);
-    await runner.run(<String>['build', 'web', '--no-pub', '--dart-define=foo=a']);
+    await runner.run(<String>['build', 'web', '--no-pub', '--dart-define=foo=a', '--dart2js-optimization=O3']);
 
-    expect(fileSystem.file(fileSystem.path.join('lib', 'generated_plugin_registrant.dart')).existsSync(), true);
+    final Directory buildDir = fileSystem.directory(fileSystem.path.join('build', 'web'));
+
+    expect(buildDir.existsSync(), true);
   }, overrides: <Type, Generator>{
     Platform: () => fakePlatform,
     FileSystem: () => fileSystem,
@@ -115,12 +106,12 @@ void main() {
         'SourceMaps': 'false',
         'NativeNullAssertions': 'true',
         'ServiceWorkerStrategy': 'offline-first',
+        'Dart2jsOptimization': 'O3',
         'BuildMode': 'release',
         'DartDefines': 'Zm9vPWE=,RkxVVFRFUl9XRUJfQVVUT19ERVRFQ1Q9dHJ1ZQ==',
         'DartObfuscation': 'false',
         'TrackWidgetCreation': 'false',
         'TreeShakeIcons': 'false',
-        'baseHref': null,
       });
     }),
   });
@@ -130,7 +121,7 @@ void main() {
   }, overrides: <Type, Generator>{
     Platform: () => fakePlatform,
     FileSystem: () => fileSystem,
-    FeatureFlags: () => TestFeatureFlags(isWebEnabled: false),
+    FeatureFlags: () => TestFeatureFlags(),
     ProcessManager: () => FakeProcessManager.any(),
   });
 
@@ -151,6 +142,31 @@ void main() {
     final BuildInfo buildInfo =
         await buildCommand.webCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
     expect(buildInfo.dartDefines, contains('FLUTTER_WEB_AUTO_DETECT=true'));
+  }, overrides: <Type, Generator>{
+    Platform: () => fakePlatform,
+    FileSystem: () => fileSystem,
+    FeatureFlags: () => TestFeatureFlags(isWebEnabled: true),
+    ProcessManager: () => FakeProcessManager.any(),
+    BuildSystem: () => TestBuildSystem.all(BuildResult(success: true)),
+  });
+
+  testUsingContext('Web build supports build-name and build-number', () async {
+    final TestWebBuildCommand buildCommand = TestWebBuildCommand();
+    final CommandRunner<void> runner = createTestCommandRunner(buildCommand);
+    setupFileSystemForEndToEndTest(fileSystem);
+
+    await runner.run(<String>[
+      'build',
+      'web',
+      '--no-pub',
+      '--build-name=1.2.3',
+      '--build-number=42',
+    ]);
+
+    final BuildInfo buildInfo = await buildCommand.webCommand
+        .getBuildInfo(forcedBuildMode: BuildMode.debug);
+    expect(buildInfo.buildNumber, '42');
+    expect(buildInfo.buildName, '1.2.3');
   }, overrides: <Type, Generator>{
     Platform: () => fakePlatform,
     FileSystem: () => fileSystem,
@@ -225,7 +241,7 @@ class TestWebBuildCommand extends FlutterCommand {
   final String description = 'Build a test executable app.';
 
   @override
-  Future<FlutterCommandResult> runCommand() async => null;
+  Future<FlutterCommandResult> runCommand() async => FlutterCommandResult.fail();
 
   @override
   bool get shouldRunPub => false;

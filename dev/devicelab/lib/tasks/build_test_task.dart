@@ -5,9 +5,8 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:flutter_devicelab/common.dart';
 
-import '../framework/adb.dart';
+import '../framework/devices.dart';
 import '../framework/task_result.dart';
 import '../framework/utils.dart';
 
@@ -17,10 +16,9 @@ import '../framework/utils.dart';
 abstract class BuildTestTask {
   BuildTestTask(this.args, {this.workingDirectory, this.runFlutterClean = true,}) {
     final ArgResults argResults = argParser.parse(args);
-    applicationBinaryPath = argResults[kApplicationBinaryPathOption] as String;
+    applicationBinaryPath = argResults[kApplicationBinaryPathOption] as String?;
     buildOnly = argResults[kBuildOnlyFlag] as bool;
     testOnly = argResults[kTestOnlyFlag] as bool;
-
   }
 
   static const String kApplicationBinaryPathOption = 'application-binary-path';
@@ -47,10 +45,10 @@ abstract class BuildTestTask {
   /// Path to a built application to use in [test].
   ///
   /// If not given, will default to child's expected location.
-  String applicationBinaryPath;
+  String? applicationBinaryPath;
 
   /// Where the test artifacts are stored, such as performance results.
-  final Directory workingDirectory;
+  final Directory? workingDirectory;
 
   /// Run Flutter build to create [applicationBinaryPath].
   Future<void> build() async {
@@ -61,6 +59,7 @@ abstract class BuildTestTask {
       }
       section('BUILDING APPLICATION');
       await flutter('build', options: getBuildArgs(deviceOperatingSystem));
+      copyArtifacts();
     });
 
   }
@@ -85,6 +84,11 @@ abstract class BuildTestTask {
   /// Args passed to flutter drive to test the built application.
   List<String> getTestArgs(DeviceOperatingSystem deviceOperatingSystem, String deviceId) => throw UnimplementedError('getTestArgs is not implemented');
 
+  /// Copy artifacts to [applicationBinaryPath] if specified.
+  ///
+  /// This is needed when running from CI, so that LUCI recipes know where to locate and upload artifacts to GCS.
+  void copyArtifacts() => throw UnimplementedError('copyArtifacts is not implemented');
+
   /// Logic to construct [TaskResult] from this test's results.
   Future<TaskResult> parseTaskResult() => throw UnimplementedError('parseTaskResult is not implemented');
 
@@ -92,7 +96,7 @@ abstract class BuildTestTask {
   ///
   /// Tasks can override to support default values. Otherwise, it will default
   /// to needing to be passed as an argument in the test runner.
-  String getApplicationBinaryPath() => applicationBinaryPath;
+  String? getApplicationBinaryPath() => applicationBinaryPath;
 
   /// Run this task.
   ///
@@ -102,12 +106,8 @@ abstract class BuildTestTask {
       throw Exception('Both build and test should not be passed. Pass only one.');
     }
 
-    if (buildOnly && applicationBinaryPath != null) {
-      throw Exception('Application binary path is only used for tests');
-    }
-
     if (!testOnly) {
-      unawaited(build());
+      await build();
     }
 
     if (buildOnly) {

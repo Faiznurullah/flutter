@@ -4,7 +4,6 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vector_math/vector_math_64.dart';
 
 void main() {
   test('wrapped HitTestResult gets HitTestEntry added to wrapping HitTestResult', () async {
@@ -59,7 +58,9 @@ void main() {
     expect(currentTransform(wrapped), equals(m2 * m1));
 
     result.publicPushTransform(m3);
+    // ignore: avoid_dynamic_calls
     expect(currentTransform(result), equals(m3 * m2 * m1));
+    // ignore: avoid_dynamic_calls
     expect(currentTransform(wrapped), equals(m3 * m2 * m1));
 
     result.publicPopTransform();
@@ -103,7 +104,9 @@ void main() {
     expect(currentTransform(wrapped), equals(m1 * m3));
 
     result.publicPushTransform(m2);
+    // ignore: avoid_dynamic_calls
     expect(currentTransform(result), equals(m2 * m1 * m3));
+    // ignore: avoid_dynamic_calls
     expect(currentTransform(wrapped), equals(m2 * m1 * m3));
 
     result.publicPopTransform();
@@ -115,6 +118,7 @@ void main() {
     result.publicPushOffset(o3);
     result.publicPushTransform(m1);
 
+    // ignore: avoid_dynamic_calls
     expect(currentTransform(result), equals(m1 * m3 * m2));
 
     result.publicPopTransform();
@@ -132,7 +136,7 @@ class _DummyHitTestTarget implements HitTestTarget {
 
 class MyHitTestResult extends HitTestResult {
   MyHitTestResult();
-  MyHitTestResult.wrap(HitTestResult result) : super.wrap(result);
+  MyHitTestResult.wrap(super.result) : super.wrap();
 
   void publicPushTransform(Matrix4 transform) => pushTransform(transform);
   void publicPushOffset(Offset offset) => pushOffset(offset);

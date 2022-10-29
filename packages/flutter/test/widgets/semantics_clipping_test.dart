@@ -18,6 +18,7 @@ void main() {
         child: SizedBox(
           width: 100.0,
           child: Flex(
+            clipBehavior: Clip.hardEdge,
             direction: Axis.horizontal,
             children: const <Widget>[
               SizedBox(
@@ -40,7 +41,9 @@ void main() {
 
     final dynamic exception = tester.takeException();
     expect(exception, isFlutterError);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.level, DiagnosticLevel.summary);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.toString(), contains('overflowed'));
 
     expect(semantics, hasSemantics(
@@ -73,6 +76,7 @@ void main() {
         child: SizedBox(
           width: 100.0,
           child: Flex(
+            clipBehavior: Clip.hardEdge,
             direction: Axis.horizontal,
             children: <Widget>[
               const SizedBox(
@@ -102,7 +106,9 @@ void main() {
 
     final dynamic exception = tester.takeException();
     expect(exception, isFlutterError);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.level, DiagnosticLevel.summary);
+    // ignore: avoid_dynamic_calls
     expect(exception.diagnostics.first.toString(), contains('overflowed'));
 
     expect(semantics, hasSemantics(

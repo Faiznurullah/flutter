@@ -10,11 +10,11 @@ Future<void> main() async {
   const MethodChannel channel = MethodChannel('com.example.abstract_method_smoke_test');
   await channel.invokeMethod<void>('show_keyboard');
   runApp(const MyApp());
-  print('Test suceeded');
+  print('Test succeeded');
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePage();
@@ -42,7 +42,7 @@ class _HomePage extends State<HomePage> {
 
     // Trigger the second route.
     // https://github.com/flutter/flutter/issues/40126
-    WidgetsBinding.instance?.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SecondPage()));
     });
@@ -55,7 +55,7 @@ class _HomePage extends State<HomePage> {
 }
 
 class SecondPage extends StatelessWidget {
-  const SecondPage({Key? key}) : super(key: key);
+  const SecondPage({super.key});
 
   @override
   Widget build(BuildContext context) {

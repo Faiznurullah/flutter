@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:intl/intl.dart';
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as path;
+import 'package:platform/platform.dart';
 import 'package:process/process.dart';
 
 import 'dartdoc_checker.dart';
 
 const String kDocsRoot = 'dev/docs';
 const String kPublishRoot = '$kDocsRoot/doc';
-const String kSnippetsRoot = 'dev/snippets';
 
 const String kDummyPackageName = 'Flutter';
 const String kPlatformIntegrationPackageName = 'platform_integration';
@@ -43,20 +42,21 @@ Future<void> main(List<String> arguments) async {
     exit(0);
   }
   // If we're run from the `tools` dir, set the cwd to the repo root.
-  if (path.basename(Directory.current.path) == 'tools')
+  if (path.basename(Directory.current.path) == 'tools') {
     Directory.current = Directory.current.parent.parent;
+  }
 
   final ProcessResult flutter = Process.runSync('flutter', <String>[]);
   final File versionFile = File('version');
-  if (flutter.exitCode != 0 || !versionFile.existsSync())
+  if (flutter.exitCode != 0 || !versionFile.existsSync()) {
     throw Exception('Failed to determine Flutter version.');
+  }
   final String version = versionFile.readAsStringSync();
 
   // Create the pubspec.yaml file.
   final StringBuffer buf = StringBuffer();
   buf.writeln('name: $kDummyPackageName');
   buf.writeln('homepage: https://flutter.dev');
-  // TODO(dnfield): Re-factor for proper versioning, https://github.com/flutter/flutter/issues/55409
   buf.writeln('version: 0.0.0');
   buf.writeln('environment:');
   buf.writeln("  sdk: '>=2.10.0 <3.0.0'");
@@ -92,20 +92,21 @@ Future<void> main(List<String> arguments) async {
     pubEnvironment['PUB_CACHE'] = pubCachePath;
   }
 
-  final String pubExecutable = '$flutterRoot/bin/cache/dart-sdk/bin/pub';
+  final String dartExecutable = '$flutterRoot/bin/cache/dart-sdk/bin/dart';
 
   // Run pub.
-  ProcessWrapper process = ProcessWrapper(await Process.start(
-    pubExecutable,
-    <String>['get'],
+  ProcessWrapper process = ProcessWrapper(await runPubProcess(
+    dartBinaryPath: dartExecutable,
+    arguments: <String>['get'],
     workingDirectory: kDocsRoot,
     environment: pubEnvironment,
   ));
   printStream(process.stdout, prefix: 'pub:stdout: ');
   printStream(process.stderr, prefix: 'pub:stderr: ');
   final int code = await process.done;
-  if (code != 0)
+  if (code != 0) {
     exit(code);
+  }
 
   createFooter('$kDocsRoot/lib/', version);
   copyAssets();
@@ -119,14 +120,26 @@ Future<void> main(List<String> arguments) async {
     'dartdoc',
   ];
 
-  // Verify which version of dartdoc we're using.
-  final ProcessResult result = Process.runSync(
-    pubExecutable,
-    <String>[...dartdocBaseArgs, '--version'],
+  // Verify which version of snippets and dartdoc we're using.
+  final ProcessResult snippetsResult = Process.runSync(
+    dartExecutable,
+    <String>[
+      'pub',
+      'global',
+      'list',
+    ],
     workingDirectory: kDocsRoot,
     environment: pubEnvironment,
+    stdoutEncoding: utf8,
   );
-  print('\n${result.stdout}flutter version: $version\n');
+  print('');
+  final Iterable<RegExpMatch> versionMatches = RegExp(r'^(?<name>snippets|dartdoc) (?<version>[^\s]+)', multiLine: true)
+      .allMatches(snippetsResult.stdout as String);
+  for (final RegExpMatch match in versionMatches) {
+    print('${match.namedGroup('name')} version: ${match.namedGroup('version')}');
+  }
+
+  print('flutter version: $version\n');
 
   // Dartdoc warnings and errors in these packages are considered fatal.
   // All packages owned by flutter should be in the list.
@@ -162,7 +175,6 @@ Future<void> main(List<String> arguments) async {
       'analyzer',
       'args',
       'barback',
-      'cli_util',
       'csslib',
       'flutter_goldens',
       'flutter_goldens_client',
@@ -206,11 +218,11 @@ Future<void> main(List<String> arguments) async {
   ];
 
   String quote(String arg) => arg.contains(' ') ? "'$arg'" : arg;
-  print('Executing: (cd $kDocsRoot ; $pubExecutable ${dartdocArgs.map<String>(quote).join(' ')})');
+  print('Executing: (cd $kDocsRoot ; $dartExecutable ${dartdocArgs.map<String>(quote).join(' ')})');
 
-  process = ProcessWrapper(await Process.start(
-    pubExecutable,
-    dartdocArgs,
+  process = ProcessWrapper(await runPubProcess(
+    dartBinaryPath: dartExecutable,
+    arguments: dartdocArgs,
     workingDirectory: kDocsRoot,
     environment: pubEnvironment,
   ));
@@ -227,8 +239,9 @@ Future<void> main(List<String> arguments) async {
   );
   final int exitCode = await process.done;
 
-  if (exitCode != 0)
+  if (exitCode != 0) {
     exit(exitCode);
+  }
 
   sanityCheckDocs();
   checkForUnresolvedDirectives('$kPublishRoot/api');
@@ -240,36 +253,51 @@ ArgParser _createArgsParser() {
   final ArgParser parser = ArgParser();
   parser.addFlag('help', abbr: 'h', negatable: false,
       help: 'Show command help.');
-  parser.addFlag('verbose', negatable: true, defaultsTo: true,
+  parser.addFlag('verbose', defaultsTo: true,
       help: 'Whether to report all error messages (on) or attempt to '
-          'filter out some known false positives (off).  Shut this off '
+          'filter out some known false positives (off). Shut this off '
           'locally if you want to address Flutter-specific issues.');
-  parser.addFlag('checked', abbr: 'c', negatable: true,
+  parser.addFlag('checked', abbr: 'c',
       help: 'Run dartdoc in checked mode.');
-  parser.addFlag('json', negatable: true,
+  parser.addFlag('json',
       help: 'Display json-formatted output from dartdoc and skip stdout/stderr prefixing.');
-  parser.addFlag('validate-links', negatable: true,
+  parser.addFlag('validate-links',
       help: 'Display warnings for broken links generated by dartdoc (slow)');
   return parser;
 }
 
 final RegExp gitBranchRegexp = RegExp(r'^## (.*)');
 
-String getBranchName() {
-  final ProcessResult gitResult = Process.runSync('git', <String>['status', '-b', '--porcelain']);
-  if (gitResult.exitCode != 0)
+/// Get the name of the release branch.
+///
+/// On LUCI builds, the git HEAD is detached, so first check for the env
+/// variable "LUCI_BRANCH"; if it is not set, fall back to calling git.
+String getBranchName({
+  @visibleForTesting
+  Platform platform = const LocalPlatform(),
+  @visibleForTesting
+  ProcessManager processManager = const LocalProcessManager(),
+}) {
+  final String? luciBranch = platform.environment['LUCI_BRANCH'];
+  if (luciBranch != null && luciBranch.trim().isNotEmpty) {
+    return luciBranch.trim();
+  }
+  final ProcessResult gitResult = processManager.runSync(<String>['git', 'status', '-b', '--porcelain']);
+  if (gitResult.exitCode != 0) {
     throw 'git status exit with non-zero exit code: ${gitResult.exitCode}';
-  final Match gitBranchMatch = gitBranchRegexp.firstMatch(
+  }
+  final RegExpMatch? gitBranchMatch = gitBranchRegexp.firstMatch(
       (gitResult.stdout as String).trim().split('\n').first);
-  return gitBranchMatch == null ? '' : gitBranchMatch.group(1).split('...').first;
+  return gitBranchMatch == null ? '' : gitBranchMatch.group(1)!.split('...').first;
 }
 
 String gitRevision() {
   const int kGitRevisionLength = 10;
 
   final ProcessResult gitResult = Process.runSync('git', <String>['rev-parse', 'HEAD']);
-  if (gitResult.exitCode != 0)
+  if (gitResult.exitCode != 0) {
     throw 'git rev-parse exit with non-zero exit code: ${gitResult.exitCode}';
+  }
   final String gitRevision = (gitResult.stdout as String).trim();
 
   return gitRevision.length > kGitRevisionLength ? gitRevision.substring(0, kGitRevisionLength) : gitRevision;
@@ -315,12 +343,14 @@ void createSearchMetadata(String templatePath, String metadataPath) {
 /// specified, for each source/destination file pair.
 ///
 /// Creates `destDir` if needed.
-void copyDirectorySync(Directory srcDir, Directory destDir, [void Function(File srcFile, File destFile) onFileCopied]) {
-  if (!srcDir.existsSync())
+void copyDirectorySync(Directory srcDir, Directory destDir, [void Function(File srcFile, File destFile)? onFileCopied]) {
+  if (!srcDir.existsSync()) {
     throw Exception('Source directory "${srcDir.path}" does not exist, nothing to copy');
+  }
 
-  if (!destDir.existsSync())
+  if (!destDir.existsSync()) {
     destDir.createSync(recursive: true);
+  }
 
   for (final FileSystemEntity entity in srcDir.listSync()) {
     final String newPath = path.join(destDir.path, path.basename(entity.path));
@@ -358,6 +388,21 @@ void cleanOutSnippets() {
   }
 }
 
+void _sanityCheckExample(String fileString, String regExpString) {
+  final File file = File(fileString);
+  if (file.existsSync()) {
+    final RegExp regExp = RegExp(regExpString, dotAll: true);
+    final String contents = file.readAsStringSync();
+    if (!regExp.hasMatch(contents)) {
+      throw Exception("Missing example code in ${file.path}. Either it didn't get published, publishing has changed, or the example no longer exists.");
+    }
+  } else {
+    throw Exception(
+        "Missing example code sanity test file ${file.path}. Either it didn't get published, or you might have to update the test to look at a different file.");
+  }
+}
+
+/// Runs a sanity check by running a test.
 void sanityCheckDocs() {
   final List<String> canaries = <String>[
     '$kPublishRoot/assets/overrides.css',
@@ -371,9 +416,29 @@ void sanityCheckDocs() {
     '$kPublishRoot/api/widgets/Widget-class.html',
   ];
   for (final String canary in canaries) {
-    if (!File(canary).existsSync())
+    if (!File(canary).existsSync()) {
       throw Exception('Missing "$canary", which probably means the documentation failed to build correctly.');
+    }
   }
+  // Make sure at least one example of each kind includes source code.
+
+  // Check a "sample" example, any one will do.
+  _sanityCheckExample(
+    '$kPublishRoot/api/widgets/showGeneralDialog.html',
+    r'\s*<pre\s+id="longSnippet1".*<code\s+class="language-dart">\s*import &#39;package:flutter&#47;material.dart&#39;;',
+  );
+
+  // Check a "snippet" example, any one will do.
+  _sanityCheckExample(
+    '$kPublishRoot/api/widgets/ModalRoute/barrierColor.html',
+    r'\s*<pre.*id="sample-code">.*Color\s+get\s+barrierColor.*</pre>',
+  );
+
+  // Check a "dartpad" example, any one will do.
+  _sanityCheckExample(
+    '$kPublishRoot/api/widgets/PhysicalShape-class.html',
+    r'\s*<iframe\s+class="snippet-dartpad"\s+src="https://dartpad\.dev.*sample_id=widgets\.PhysicalShape\.\d+.*">\s*</iframe>',
+  );
 }
 
 /// Creates a custom index.html because we try to maintain old
@@ -441,7 +506,6 @@ void putRedirectInOldIndexLocation() {
   File('$kPublishRoot/flutter/index.html').writeAsStringSync(metaTag);
 }
 
-
 void writeSnippetsIndexFile() {
   final Directory snippetsDir = Directory(path.join(kPublishRoot, 'snippets'));
   if (snippetsDir.existsSync()) {
@@ -467,8 +531,9 @@ List<Directory> findPackages() {
   return Directory('packages')
     .listSync()
     .where((FileSystemEntity entity) {
-      if (entity is! Directory)
+      if (entity is! Directory) {
         return false;
+      }
       final File pubspec = File('${entity.path}/pubspec.yaml');
       if (!pubspec.existsSync()) {
         print("Unexpected package '${entity.path}' found in packages directory");
@@ -504,7 +569,23 @@ void printStream(Stream<List<int>> stream, { String prefix = '', List<Pattern> f
     .transform<String>(utf8.decoder)
     .transform<String>(const LineSplitter())
     .listen((String line) {
-      if (!filter.any((Pattern pattern) => line.contains(pattern)))
+      if (!filter.any((Pattern pattern) => line.contains(pattern))) {
         print('$prefix$line'.trim());
+      }
     });
+}
+
+Future<Process> runPubProcess({
+  required String dartBinaryPath,
+  required List<String> arguments,
+  String? workingDirectory,
+  Map<String, String>? environment,
+  @visibleForTesting
+  ProcessManager processManager = const LocalProcessManager(),
+}) {
+  return processManager.start(
+    <Object>[dartBinaryPath, 'pub', ...arguments],
+    workingDirectory: workingDirectory,
+    environment: environment,
+  );
 }

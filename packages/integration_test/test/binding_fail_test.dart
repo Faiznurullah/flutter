@@ -10,8 +10,7 @@ import 'package:path/path.dart' as path;
 
 final String bat = Platform.isWindows ? '.bat' : '';
 final String _flutterBin = path.join(Directory.current.parent.parent.path, 'bin', 'flutter$bat');
-const String _integrationResultsPrefix =
-    'IntegrationTestWidgetsFlutterBinding test results:';
+const String _integrationResultsPrefix = 'IntegrationTestWidgetsFlutterBinding test results:';
 const String _failureExcerpt = r'Expected: <false>\n  Actual: <true>';
 
 Future<void> main() async {
@@ -41,6 +40,14 @@ Future<void> main() async {
       expect(results, hasLength(2));
       expect(results, containsPair('passing test', equals('success')));
       expect(results, containsPair('failing test', contains(_failureExcerpt)));
+    });
+
+    test('when one test fails, then another passes', () async {
+      final Map<String, dynamic>? results = await _runTest(path.join('test', 'data', 'fail_then_pass_test_script.dart'));
+
+      expect(results, hasLength(2));
+      expect(results, containsPair('failing test', contains(_failureExcerpt)));
+      expect(results, containsPair('passing test', equals('success')));
     });
   });
 }
@@ -73,7 +80,7 @@ Future<Map<String, dynamic>?> _runTest(String scriptPath) async {
             }
             return <Map<String, dynamic>>[
               if (json != null)
-                json as Map<String, dynamic>
+                json as Map<String, dynamic>,
             ];
           })
           .where((Map<String, dynamic> testEvent) => testEvent['type'] == 'print')

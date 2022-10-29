@@ -17,6 +17,7 @@ import '../base/platform.dart';
 import '../base/utils.dart';
 import '../cache.dart';
 import '../convert.dart';
+import '../reporting/reporting.dart';
 import 'exceptions.dart';
 import 'file_store.dart';
 import 'source.dart';
@@ -191,7 +192,7 @@ abstract class Target {
   /// Resolve the set of input patterns and functions into a concrete list of
   /// files.
   ResolvedFiles resolveInputs(Environment environment) {
-    return _resolveConfiguration(inputs, depfiles, environment, implicit: true, inputs: true);
+    return _resolveConfiguration(inputs, depfiles, environment);
   }
 
   /// Find the current set of declared outputs, including wildcard directories.
@@ -236,8 +237,11 @@ abstract class Target {
     return environment.buildDir.childFile(fileName);
   }
 
-  static ResolvedFiles _resolveConfiguration(List<Source> config,
-    List<String> depfiles, Environment environment, { bool implicit = true, bool inputs = true,
+  static ResolvedFiles _resolveConfiguration(
+    List<Source> config,
+    List<String> depfiles,
+    Environment environment, {
+    bool inputs = true,
   }) {
     final SourceVisitor collector = SourceVisitor(environment, inputs);
     for (final Source source in config) {
@@ -329,6 +333,7 @@ class Environment {
     required Artifacts artifacts,
     required ProcessManager processManager,
     required Platform platform,
+    required Usage usage,
     String? engineVersion,
     required bool generateDartPluginRegistry,
     Directory? buildDir,
@@ -369,6 +374,7 @@ class Environment {
       artifacts: artifacts,
       processManager: processManager,
       platform: platform,
+      usage: usage,
       engineVersion: engineVersion,
       inputs: inputs,
       generateDartPluginRegistry: generateDartPluginRegistry,
@@ -389,6 +395,7 @@ class Environment {
     Map<String, String> inputs = const <String, String>{},
     String? engineVersion,
     Platform? platform,
+    Usage? usage,
     bool generateDartPluginRegistry = false,
     required FileSystem fileSystem,
     required Logger logger,
@@ -408,6 +415,7 @@ class Environment {
       artifacts: artifacts,
       processManager: processManager,
       platform: platform ?? FakePlatform(),
+      usage: usage ?? TestUsage(),
       engineVersion: engineVersion,
       generateDartPluginRegistry: generateDartPluginRegistry,
     );
@@ -426,6 +434,7 @@ class Environment {
     required this.logger,
     required this.fileSystem,
     required this.artifacts,
+    required this.usage,
     this.engineVersion,
     required this.inputs,
     required this.generateDartPluginRegistry,
@@ -505,6 +514,8 @@ class Environment {
   final Artifacts artifacts;
 
   final FileSystem fileSystem;
+
+  final Usage usage;
 
   /// The version of the current engine, or `null` if built with a local engine.
   final String? engineVersion;
@@ -605,7 +616,7 @@ class FlutterBuildSystem extends BuildSystem {
       // Always persist the file cache to disk.
       fileCache.persist();
     }
-    // TODO(jonahwilliams): this is a bit of a hack, due to various parts of
+    // This is a bit of a hack, due to various parts of
     // the flutter tool writing these files unconditionally. Since Xcode uses
     // timestamps to track files, this leads to unnecessary rebuilds if they
     // are included. Once all the places that write these files have been
@@ -860,13 +871,11 @@ class _BuildInstance {
         ErrorHandlingFileSystem.deleteIfExists(previousFile);
       }
     } on Exception catch (exception, stackTrace) {
-      // TODO(jonahwilliams): throw specific exception for expected errors to mark
-      // as non-fatal. All others should be fatal.
       node.target.clearStamp(environment);
       succeeded = false;
       skipped = false;
       exceptionMeasurements[node.target.name] = ExceptionMeasurement(
-          node.target.name, exception, stackTrace);
+          node.target.name, exception, stackTrace, fatal: true);
     } finally {
       resource.release();
       stopwatch.stop();

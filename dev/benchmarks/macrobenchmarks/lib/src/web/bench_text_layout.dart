@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:html' as html;
-import 'dart:js_util' as js_util;
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -31,7 +29,7 @@ class ParagraphGenerator {
   /// font-size so that the engine doesn't reuse a cached ruler.
   ui.Paragraph generate(
     String text, {
-    int maxLines,
+    int? maxLines,
     bool hasEllipsis = false,
   }) {
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(ui.ParagraphStyle(
@@ -47,30 +45,29 @@ class ParagraphGenerator {
   }
 }
 
-/// Sends a platform message to the web engine to enable/disable the usage of
-/// the new canvas-based text measurement implementation.
-void _useCanvasText(bool useCanvasText) {
-  js_util.callMethod(
-    html.window,
-    '_flutter_internal_update_experiment',
-    <dynamic>['useCanvasText', useCanvasText],
-  );
+/// Which mode to run [BenchBuildColorsGrid] in.
+enum _TestMode {
+  /// Uses the HTML rendering backend with the canvas 2D text layout.
+  useCanvasTextLayout,
+
+  /// Uses CanvasKit for everything.
+  useCanvasKit,
 }
 
-/// Repeatedly lays out a paragraph using the DOM measurement approach.
+/// Repeatedly lays out a paragraph.
 ///
 /// Creates a different paragraph each time in order to avoid hitting the cache.
 class BenchTextLayout extends RawRecorder {
-  BenchTextLayout({@required this.useCanvas})
-      : super(name: useCanvas ? canvasBenchmarkName : domBenchmarkName);
+  BenchTextLayout.canvas()
+      : super(name: canvasBenchmarkName);
 
-  static const String domBenchmarkName = 'text_dom_layout';
+  BenchTextLayout.canvasKit()
+      : super(name: canvasKitBenchmarkName);
+
   static const String canvasBenchmarkName = 'text_canvas_layout';
+  static const String canvasKitBenchmarkName = 'text_canvaskit_layout';
 
   final ParagraphGenerator generator = ParagraphGenerator();
-
-  /// Whether to use the new canvas-based text measurement implementation.
-  final bool useCanvas;
 
   static const String singleLineText = '*** ** ****';
   static const String multiLineText = '*** ****** **** *** ******** * *** '
@@ -80,8 +77,6 @@ class BenchTextLayout extends RawRecorder {
 
   @override
   void body(Profile profile) {
-    _useCanvasText(useCanvas);
-
     recordParagraphOperations(
       profile: profile,
       paragraph: generator.generate(singleLineText),
@@ -113,16 +108,14 @@ class BenchTextLayout extends RawRecorder {
       keyPrefix: 'ellipsis',
       maxWidth: 200.0,
     );
-
-    _useCanvasText(null);
   }
 
   void recordParagraphOperations({
-    @required Profile profile,
-    @required ui.Paragraph paragraph,
-    @required String text,
-    @required String keyPrefix,
-    @required double maxWidth,
+    required Profile profile,
+    required ui.Paragraph paragraph,
+    required String text,
+    required String keyPrefix,
+    required double maxWidth,
   }) {
     profile.record('$keyPrefix.layout', () {
       paragraph.layout(ui.ParagraphConstraints(width: maxWidth));
@@ -144,37 +137,33 @@ class BenchTextLayout extends RawRecorder {
   }
 }
 
-/// Repeatedly lays out a paragraph using the DOM measurement approach.
+/// Repeatedly lays out the same paragraph.
 ///
 /// Uses the same paragraph content to make sure we hit the cache. It doesn't
 /// use the same paragraph instance because the layout method will shortcircuit
 /// in that case.
 class BenchTextCachedLayout extends RawRecorder {
-  BenchTextCachedLayout({@required this.useCanvas})
-      : super(name: useCanvas ? canvasBenchmarkName : domBenchmarkName);
+  BenchTextCachedLayout.canvas()
+      : super(name: canvasBenchmarkName);
 
-  static const String domBenchmarkName = 'text_dom_cached_layout';
+  BenchTextCachedLayout.canvasKit()
+      : super(name: canvasKitBenchmarkName);
+
   static const String canvasBenchmarkName = 'text_canvas_cached_layout';
+  static const String canvasKitBenchmarkName = 'text_canvas_kit_cached_layout';
 
-  /// Whether to use the new canvas-based text measurement implementation.
-  final bool useCanvas;
-
-  final ui.ParagraphBuilder builder =
-      ui.ParagraphBuilder(ui.ParagraphStyle(fontFamily: 'sans-serif'))
+  @override
+  void body(Profile profile) {
+    final ui.ParagraphBuilder builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontFamily: 'sans-serif'))
         ..pushStyle(ui.TextStyle(fontSize: 12.0))
         ..addText(
           'Lorem ipsum dolor sit amet, consectetur adipiscing elit, '
           'sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
         );
-
-  @override
-  void body(Profile profile) {
-    _useCanvasText(useCanvas);
     final ui.Paragraph paragraph = builder.build();
     profile.record('layout', () {
       paragraph.layout(const ui.ParagraphConstraints(width: double.infinity));
     }, reported: true);
-    _useCanvasText(null);
   }
 }
 
@@ -185,18 +174,6 @@ class BenchTextCachedLayout extends RawRecorder {
 /// build are unique.
 int _counter = 0;
 
-/// Which mode to run [BenchBuildColorsGrid] in.
-enum _TestMode {
-  /// Uses the HTML rendering backend with the canvas 2D text layout.
-  useCanvasTextLayout,
-
-  /// Uses the HTML rendering backend with the DOM text layout.
-  useDomTextLayout,
-
-  /// Uses CanvasKit for everything.
-  useCanvasKit,
-}
-
 /// Measures how expensive it is to construct a realistic text-heavy piece of UI.
 ///
 /// The benchmark constructs a tabbed view, where each tab displays a list of
@@ -204,8 +181,7 @@ enum _TestMode {
 class BenchBuildColorsGrid extends WidgetBuildRecorder {
   BenchBuildColorsGrid.canvas()
       : _mode = _TestMode.useCanvasTextLayout, super(name: canvasBenchmarkName);
-  BenchBuildColorsGrid.dom()
-      : _mode = _TestMode.useDomTextLayout, super(name: domBenchmarkName);
+
   BenchBuildColorsGrid.canvasKit()
       : _mode = _TestMode.useCanvasKit, super(name: canvasKitBenchmarkName);
 
@@ -214,12 +190,9 @@ class BenchBuildColorsGrid extends WidgetBuildRecorder {
   /// When tracing is enabled, DOM layout takes longer to complete. This has a
   /// significant effect on the benchmark since we do a lot of text layout
   /// operations that trigger synchronous DOM layout.
-  ///
-  /// Tracing has a negative effect only in [_TestMode.useDomTextLayout] mode.
   @override
   bool get isTracingEnabled => false;
 
-  static const String domBenchmarkName = 'text_dom_color_grid';
   static const String canvasBenchmarkName = 'text_canvas_color_grid';
   static const String canvasKitBenchmarkName = 'text_canvas_kit_color_grid';
 
@@ -230,12 +203,6 @@ class BenchBuildColorsGrid extends WidgetBuildRecorder {
 
   @override
   Future<void> setUpAll() async {
-    if (_mode == _TestMode.useCanvasTextLayout) {
-      _useCanvasText(true);
-    }
-    if (_mode == _TestMode.useDomTextLayout) {
-      _useCanvasText(false);
-    }
     registerEngineBenchmarkValueListener('text_layout', (num value) {
       _textLayoutMicros += value;
     });
@@ -243,7 +210,6 @@ class BenchBuildColorsGrid extends WidgetBuildRecorder {
 
   @override
   Future<void> tearDownAll() async {
-    _useCanvasText(null);
     stopListeningToEngineBenchmarkValues('text_layout');
   }
 
@@ -259,7 +225,7 @@ class BenchBuildColorsGrid extends WidgetBuildRecorder {
     // updates the value of [showWidget] in preparation for the next frame.
     // TODO(yjbanov): https://github.com/flutter/flutter/issues/53877
     if (showWidget && _mode != _TestMode.useCanvasKit) {
-      profile.addDataPoint(
+      profile!.addDataPoint(
         'text_layout',
         Duration(microseconds: _textLayoutMicros.toInt()),
         reported: true,
@@ -281,15 +247,13 @@ class BenchBuildColorsGrid extends WidgetBuildRecorder {
 const double kColorItemHeight = 48.0;
 
 class Palette {
-  Palette({this.name, this.primary, this.accent, this.threshold = 900});
+  Palette({required this.name, required this.primary, this.accent, this.threshold = 900});
 
   final String name;
   final MaterialColor primary;
-  final MaterialAccentColor accent;
+  final MaterialAccentColor? accent;
   final int
       threshold; // titles for indices > threshold are white, otherwise black
-
-  bool get isValid => name != null && primary != null && threshold != null;
 }
 
 final List<Palette> allPalettes = <Palette>[
@@ -372,14 +336,13 @@ final List<Palette> allPalettes = <Palette>[
 
 class ColorItem extends StatelessWidget {
   const ColorItem({
-    Key key,
-    @required this.index,
-    @required this.color,
+    super.key,
+    required this.index,
+    required this.color,
     this.prefix = '',
   })  : assert(index != null),
         assert(color != null),
-        assert(prefix != null),
-        super(key: key);
+        assert(prefix != null);
 
   final int index;
   final Color color;
@@ -401,7 +364,6 @@ class ColorItem extends StatelessWidget {
           bottom: false,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Text('$_counter:$prefix$index'),
               Text(colorString()),
@@ -414,11 +376,10 @@ class ColorItem extends StatelessWidget {
 }
 
 class PaletteTabView extends StatelessWidget {
-  PaletteTabView({
-    Key key,
-    @required this.colors,
-  })  : assert(colors != null && colors.isValid),
-        super(key: key);
+  const PaletteTabView({
+    super.key,
+    required this.colors,
+  });
 
   final Palette colors;
 
@@ -432,7 +393,7 @@ class PaletteTabView extends StatelessWidget {
     600,
     700,
     800,
-    900
+    900,
   ];
   static const List<int> accentKeys = <int>[100, 200, 400, 700];
 
@@ -440,9 +401,9 @@ class PaletteTabView extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final TextStyle whiteTextStyle =
-        textTheme.bodyText2.copyWith(color: Colors.white);
+        textTheme.bodyMedium!.copyWith(color: Colors.white);
     final TextStyle blackTextStyle =
-        textTheme.bodyText2.copyWith(color: Colors.black);
+        textTheme.bodyMedium!.copyWith(color: Colors.black);
     return Scrollbar(
       child: ListView(
         itemExtent: kColorItemHeight,
@@ -450,7 +411,7 @@ class PaletteTabView extends StatelessWidget {
           ...primaryKeys.map<Widget>((int index) {
             return DefaultTextStyle(
               style: index > colors.threshold ? whiteTextStyle : blackTextStyle,
-              child: ColorItem(index: index, color: colors.primary[index]),
+              child: ColorItem(index: index, color: colors.primary[index]!),
             );
           }),
           if (colors.accent != null)
@@ -459,7 +420,7 @@ class PaletteTabView extends StatelessWidget {
                 style:
                     index > colors.threshold ? whiteTextStyle : blackTextStyle,
                 child: ColorItem(
-                    index: index, color: colors.accent[index], prefix: 'A'),
+                    index: index, color: colors.accent![index]!, prefix: 'A'),
               );
             }),
         ],
@@ -469,7 +430,7 @@ class PaletteTabView extends StatelessWidget {
 }
 
 class ColorsDemo extends StatelessWidget {
-  const ColorsDemo({Key key}) : super(key: key);
+  const ColorsDemo({super.key});
 
   @override
   Widget build(BuildContext context) {

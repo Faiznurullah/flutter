@@ -48,11 +48,7 @@ class InkHighlight extends InteractiveInkFeature {
     RectCallback? rectCallback,
     super.onRemoved,
     Duration fadeDuration = _kDefaultHighlightFadeDuration,
-  }) : assert(color != null),
-       assert(shape != null),
-       assert(textDirection != null),
-       assert(fadeDuration != null),
-       _shape = shape,
+  }) : _shape = shape,
        _radius = radius,
        _borderRadius = borderRadius ?? BorderRadius.zero,
        _customBorder = customBorder,
@@ -109,7 +105,6 @@ class InkHighlight extends InteractiveInkFeature {
   }
 
   void _paintHighlight(Canvas canvas, Rect rect, Paint paint) {
-    assert(_shape != null);
     canvas.save();
     if (_customBorder != null) {
       canvas.clipPath(_customBorder!.getOuterPath(rect, textDirection: _textDirection));
@@ -117,7 +112,6 @@ class InkHighlight extends InteractiveInkFeature {
     switch (_shape) {
       case BoxShape.circle:
         canvas.drawCircle(rect.center, _radius ?? Material.defaultSplashRadius, paint);
-        break;
       case BoxShape.rectangle:
         if (_borderRadius != BorderRadius.zero) {
           final RRect clipRRect = RRect.fromRectAndCorners(
@@ -129,7 +123,6 @@ class InkHighlight extends InteractiveInkFeature {
         } else {
           canvas.drawRect(rect, paint);
         }
-        break;
     }
     canvas.restore();
   }

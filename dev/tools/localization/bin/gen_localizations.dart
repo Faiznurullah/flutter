@@ -71,12 +71,8 @@ String generateArbBasedLocalizationSubclasses({
   required String supportedLanguagesConstant,
   required String supportedLanguagesDocMacro,
 }) {
-  assert(localeToResources != null);
-  assert(localeToResourceAttributes != null);
   assert(generatedClassPrefix.isNotEmpty);
   assert(baseClass.isNotEmpty);
-  assert(generateHeader != null);
-  assert(generateConstructor != null);
   assert(factoryName.isNotEmpty);
   assert(factoryDeclaration.isNotEmpty);
   assert(factoryArguments.isNotEmpty);
@@ -409,10 +405,8 @@ String generateType(Map<String, dynamic>? attributes) {
     switch (attributes['x-flutter-type'] as String?) {
       case 'icuShortTimePattern':
         type = 'TimeOfDayFormat';
-        break;
       case 'scriptCategory':
         type = 'ScriptCategory';
-        break;
     }
   }
   return type + (optional ? '?' : '');

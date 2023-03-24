@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Flutter code sample for [PlatformMenuBar].
+// Flutter code sample for [PlatformMenuBar].
 
-////////////////////////////////////
 // THIS SAMPLE ONLY WORKS ON MACOS.
-////////////////////////////////////
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,12 +46,10 @@ class _PlatformMenuBarExampleState extends State<PlatformMenuBarExample> {
           applicationName: 'MenuBar Sample',
           applicationVersion: '1.0.0',
         );
-        break;
       case MenuSelection.showMessage:
         setState(() {
           _showMessage = !_showMessage;
         });
-        break;
     }
   }
 

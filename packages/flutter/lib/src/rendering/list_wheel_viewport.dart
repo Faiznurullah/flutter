@@ -146,7 +146,7 @@ class RenderListWheelViewport
     implements RenderAbstractViewport {
   /// Creates a [RenderListWheelViewport] which renders children on a wheel.
   ///
-  /// All arguments must not be null. Optional arguments have reasonable defaults.
+  /// Optional arguments have reasonable defaults.
   RenderListWheelViewport({
     required this.childManager,
     required ViewportOffset offset,
@@ -220,8 +220,6 @@ class RenderListWheelViewport
   /// viewport uses to select which part of its content to display. As the user
   /// scrolls the viewport, this value changes, which changes the content that
   /// is displayed.
-  ///
-  /// Must not be null.
   ViewportOffset get offset => _offset;
   ViewportOffset _offset;
   set offset(ViewportOffset value) {
@@ -264,7 +262,7 @@ class RenderListWheelViewport
   ///
   /// Defaults to an arbitrary but aesthetically reasonable number of 2.0.
   ///
-  /// Must not be null and must be positive.
+  /// Must be a positive number.
   /// {@endtemplate}
   double get diameterRatio => _diameterRatio;
   double _diameterRatio;
@@ -293,7 +291,7 @@ class RenderListWheelViewport
   /// A larger number brings the vanishing point closer and a smaller number
   /// pushes the vanishing point further.
   ///
-  /// Must not be null and must be positive.
+  /// Must be a positive number.
   /// {@endtemplate}
   double get perspective => _perspective;
   double _perspective;
@@ -402,7 +400,7 @@ class RenderListWheelViewport
   /// The size of the children along the main axis. Children [RenderBox]es will
   /// be given the [BoxConstraints] of this exact size.
   ///
-  /// Must not be null and must be positive.
+  /// Must be a positive number.
   /// {@endtemplate}
   double get itemExtent => _itemExtent;
   double _itemExtent;
@@ -432,7 +430,7 @@ class RenderListWheelViewport
   /// Changing this value will change the number of children built and shown
   /// inside the wheel.
   ///
-  /// Must not be null and must be positive.
+  /// Must be a positive number.
   /// {@endtemplate}
   ///
   /// Defaults to 1.
@@ -454,9 +452,9 @@ class RenderListWheelViewport
   /// If false, every child will be painted. However the [Scrollable] is still
   /// the size of the viewport and detects gestures inside only.
   ///
-  /// Defaults to false. Must not be null. Cannot be true if [clipBehavior]
-  /// is not [Clip.none] since children outside the viewport will be clipped, and
-  /// therefore cannot render children outside the viewport.
+  /// Defaults to false. Cannot be true if [clipBehavior] is not [Clip.none]
+  /// since children outside the viewport will be clipped, and therefore cannot
+  /// render children outside the viewport.
   /// {@endtemplate}
   bool get renderChildrenOutsideViewport => _renderChildrenOutsideViewport;
   bool _renderChildrenOutsideViewport;
@@ -475,7 +473,7 @@ class RenderListWheelViewport
 
   /// {@macro flutter.material.Material.clipBehavior}
   ///
-  /// Defaults to [Clip.hardEdge], and must not be null.
+  /// Defaults to [Clip.hardEdge].
   Clip get clipBehavior => _clipBehavior;
   Clip _clipBehavior = Clip.hardEdge;
   set clipBehavior(Clip value) {
@@ -1067,18 +1065,6 @@ class RenderListWheelViewport
     return result;
   }
 
-  static bool _debugAssertValidPaintTransform(ListWheelParentData parentData) {
-    if (parentData.transform == null) {
-      throw FlutterError(
-        'Child paint transform happened to be null. \n'
-        '$RenderListWheelViewport normally paints all of the children it has laid out. \n'
-        'Did you forget to update the $ListWheelParentData.transform during the paint() call? \n'
-        'If this is intetional, change or remove this assertion accordingly.'
-      );
-    }
-    return true;
-  }
-
   static bool _debugAssertValidHitTestOffsets(String context, Offset offset1, Offset offset2) {
     if (offset1 != offset2) {
       throw FlutterError("$context - hit test expected values didn't match: $offset1 != $offset2");
@@ -1090,7 +1076,6 @@ class RenderListWheelViewport
   void applyPaintTransform(RenderBox child, Matrix4 transform) {
     final ListWheelParentData parentData = child.parentData! as ListWheelParentData;
     final Matrix4? paintTransform = parentData.transform;
-    assert(_debugAssertValidPaintTransform(parentData));
     if (paintTransform != null) {
       transform.multiply(paintTransform);
     }
@@ -1110,26 +1095,25 @@ class RenderListWheelViewport
     while (child != null) {
       final ListWheelParentData childParentData = child.parentData! as ListWheelParentData;
       final Matrix4? transform = childParentData.transform;
-      assert(_debugAssertValidPaintTransform(childParentData));
-      final bool isHit = result.addWithPaintTransform(
-        transform: transform,
-        position: position,
-        hitTest: (BoxHitTestResult result, Offset transformed) {
-          assert(() {
-            if (transform == null) {
-              return _debugAssertValidHitTestOffsets('Null transform', transformed, position);
-            }
-            final Matrix4? inverted = Matrix4.tryInvert(PointerEvent.removePerspectiveTransform(transform));
-            if (inverted == null) {
-              return _debugAssertValidHitTestOffsets('Null inverted transform', transformed, position);
-            }
-            return _debugAssertValidHitTestOffsets('MatrixUtils.transformPoint', transformed, MatrixUtils.transformPoint(inverted, position));
-          }());
-          return child!.hitTest(result, position: transformed);
-        },
-      );
-      if (isHit) {
-        return true;
+      // Skip not painted children
+      if (transform != null) {
+        final bool isHit = result.addWithPaintTransform(
+          transform: transform,
+          position: position,
+          hitTest: (BoxHitTestResult result, Offset transformed) {
+            assert(() {
+              final Matrix4? inverted = Matrix4.tryInvert(PointerEvent.removePerspectiveTransform(transform));
+              if (inverted == null) {
+                return _debugAssertValidHitTestOffsets('Null inverted transform', transformed, position);
+              }
+              return _debugAssertValidHitTestOffsets('MatrixUtils.transformPoint', transformed, MatrixUtils.transformPoint(inverted, position));
+            }());
+            return child!.hitTest(result, position: transformed);
+          },
+        );
+        if (isHit) {
+          return true;
+        }
       }
       child = childParentData.previousSibling;
     }
@@ -1137,17 +1121,21 @@ class RenderListWheelViewport
   }
 
   @override
-  RevealedOffset getOffsetToReveal(RenderObject target, double alignment, { Rect? rect }) {
+  RevealedOffset getOffsetToReveal(
+    RenderObject target,
+    double alignment, {
+    Rect? rect,
+    Axis? axis, // Unused, only Axis.vertical supported by this viewport.
+  }) {
     // `target` is only fully revealed when in the selected/center position. Therefore,
     // this method always returns the offset that shows `target` in the center position,
     // which is the same offset for all `alignment` values.
-
     rect ??= target.paintBounds;
 
     // `child` will be the last RenderObject before the viewport when walking up from `target`.
     RenderObject child = target;
     while (child.parent != this) {
-      child = child.parent! as RenderObject;
+      child = child.parent!;
     }
 
     final ListWheelParentData parentData = child.parentData! as ListWheelParentData;

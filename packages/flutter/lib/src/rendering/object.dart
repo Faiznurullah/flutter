@@ -11,6 +11,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/semantics.dart';
 
+import 'binding.dart';
 import 'debug.dart';
 import 'layer.dart';
 
@@ -331,8 +332,8 @@ class PaintingContext extends ClipContext {
   void _startRecording() {
     assert(!_isRecording);
     _currentLayer = PictureLayer(estimatedBounds);
-    _recorder = ui.PictureRecorder();
-    _canvas = Canvas(_recorder!);
+    _recorder = RendererBinding.instance.createPictureRecorder();
+    _canvas = RendererBinding.instance.createCanvas(_recorder!);
     _containerLayer.append(_currentLayer!);
   }
 
@@ -822,6 +823,16 @@ typedef LayoutCallback<T extends Constraints> = void Function(T constraints);
 class _LocalSemanticsHandle implements SemanticsHandle {
   _LocalSemanticsHandle._(PipelineOwner owner, this.listener)
       : _owner = owner {
+    // TODO(polina-c): stop duplicating code across disposables
+    // https://github.com/flutter/flutter/issues/137435
+    if (kFlutterMemoryAllocationsEnabled) {
+      FlutterMemoryAllocations.instance.dispatchObjectCreated(
+        library: 'package:flutter/rendering.dart',
+        className: '$_LocalSemanticsHandle',
+        object: this,
+      );
+    }
+
     if (listener != null) {
       _owner.semanticsOwner!.addListener(listener!);
     }
@@ -834,6 +845,12 @@ class _LocalSemanticsHandle implements SemanticsHandle {
 
   @override
   void dispose() {
+    // TODO(polina-c): stop duplicating code across disposables
+    // https://github.com/flutter/flutter/issues/137435
+    if (kFlutterMemoryAllocationsEnabled) {
+      FlutterMemoryAllocations.instance.dispatchObjectDisposed(object: this);
+    }
+
     if (listener != null) {
       _owner.semanticsOwner!.removeListener(listener!);
     }
@@ -899,7 +916,7 @@ class PipelineOwner with DiagnosticableTreeMixin {
     // TODO(polina-c): stop duplicating code across disposables
     // https://github.com/flutter/flutter/issues/137435
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectCreated(
+      FlutterMemoryAllocations.instance.dispatchObjectCreated(
         library: 'package:flutter/rendering.dart',
         className: '$PipelineOwner',
         object: this,
@@ -1202,30 +1219,29 @@ class PipelineOwner with DiagnosticableTreeMixin {
   SemanticsOwner? get semanticsOwner => _semanticsOwner;
   SemanticsOwner? _semanticsOwner;
 
-  /// The number of clients registered to listen for semantics.
+  /// Deprecated.
   ///
-  /// The number is increased whenever [ensureSemantics] is called and decreased
-  /// when [SemanticsHandle.dispose] is called.
+  /// Use [SemanticsBinding.debugOutstandingSemanticsHandles] instead. This
+  /// API is broken because an outstanding semantics handle on a given pipeline
+  /// owner doesn't mean that semantics are actually produced.
+  @Deprecated(
+    'Use SemanticsBinding.debugOutstandingSemanticsHandles instead. '
+    'This API is broken (see ensureSemantics). '
+    'This feature was deprecated after v3.22.0-23.0.pre.'
+  )
   int get debugOutstandingSemanticsHandles => _outstandingSemanticsHandles;
   int _outstandingSemanticsHandles = 0;
 
-  /// Opens a [SemanticsHandle] and calls [listener] whenever the semantics tree
-  /// generated from the render tree owned by this [PipelineOwner] updates.
+  /// Deprecated.
   ///
-  /// Calling this method only ensures that this particular [PipelineOwner] will
-  /// generate a semantics tree. Consider calling
-  /// [SemanticsBinding.ensureSemantics] instead to turn on semantics globally
-  /// for the entire app.
-  ///
-  /// The [PipelineOwner] updates the semantics tree only when there are clients
-  /// that wish to use the semantics tree. These clients express their interest
-  /// by holding [SemanticsHandle] objects that notify them whenever the
-  /// semantics tree updates.
-  ///
-  /// Clients can close their [SemanticsHandle] by calling
-  /// [SemanticsHandle.dispose]. Once all the outstanding [SemanticsHandle]
-  /// objects for a given [PipelineOwner] are closed, the [PipelineOwner] stops
-  /// maintaining the semantics tree.
+  /// Call [SemanticsBinding.ensureSemantics] instead and optionally add a
+  /// listener to [PipelineOwner.semanticsOwner]. This API is broken as calling
+  /// it does not guarantee that semantics are produced.
+  @Deprecated(
+    'Call SemanticsBinding.ensureSemantics instead and optionally add a listener to PipelineOwner.semanticsOwner. '
+    'This API is broken; it does not guarantee that semantics are actually produced. '
+    'This feature was deprecated after v3.22.0-23.0.pre.'
+  )
   SemanticsHandle ensureSemantics({ VoidCallback? listener }) {
     _outstandingSemanticsHandles += 1;
     _updateSemanticsOwner();
@@ -1444,7 +1460,7 @@ class PipelineOwner with DiagnosticableTreeMixin {
     assert(_manifold == null);
     assert(_debugParent == null);
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectDisposed(object: this);
+      FlutterMemoryAllocations.instance.dispatchObjectDisposed(object: this);
     }
     _semanticsOwner?.dispose();
     _semanticsOwner = null;
@@ -1640,7 +1656,7 @@ abstract class RenderObject with DiagnosticableTreeMixin implements HitTestTarge
   /// Initializes internal fields for subclasses.
   RenderObject() {
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectCreated(
+      FlutterMemoryAllocations.instance.dispatchObjectCreated(
         library: _flutterRenderingLibrary,
         className: '$RenderObject',
         object: this,
@@ -1707,7 +1723,7 @@ abstract class RenderObject with DiagnosticableTreeMixin implements HitTestTarge
   void dispose() {
     assert(!_debugDisposed);
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectDisposed(object: this);
+      FlutterMemoryAllocations.instance.dispatchObjectDisposed(object: this);
     }
     _layerHandle.layer = null;
     assert(() {
@@ -1909,7 +1925,9 @@ abstract class RenderObject with DiagnosticableTreeMixin implements HitTestTarge
   /// This is useful when you have to temporarily clear that variable to
   /// disable some false-positive checks, such as when computing toStringDeep
   /// or using custom trees.
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   static T _withDebugActiveLayoutCleared<T>(T Function() inner) {
     RenderObject? debugPreviousActiveLayout;
     assert(() {
@@ -2187,24 +2205,24 @@ abstract class RenderObject with DiagnosticableTreeMixin implements HitTestTarge
   }
   Constraints? _constraints;
 
-  /// Verify that the object's constraints are being met. Override
-  /// this function in a subclass to verify that your state matches
-  /// the constraints object. This function is only called in checked
-  /// mode and only when needsLayout is false. If the constraints are
-  /// not met, it should assert or throw an exception.
+  /// Verify that the object's constraints are being met. Override this function
+  /// in a subclass to verify that your state matches the constraints object.
+  /// This function is only called when asserts are enabled (i.e. in debug mode)
+  /// and only when needsLayout is false. If the constraints are not met, it
+  /// should assert or throw an exception.
   @protected
   void debugAssertDoesMeetConstraints();
 
-  /// When true, debugAssertDoesMeetConstraints() is currently
-  /// executing asserts for verifying the consistent behavior of
+  /// When true, a debug method ([debugAssertDoesMeetConstraints], for instance)
+  /// is currently executing asserts for verifying the consistent behavior of
   /// intrinsic dimensions methods.
   ///
-  /// This should only be set by debugAssertDoesMeetConstraints()
-  /// implementations. It is used by tests to selectively ignore
-  /// custom layout callbacks. It should not be set outside of
-  /// debugAssertDoesMeetConstraints(), and should not be checked in
-  /// release mode (where it will always be false).
+  /// This is typically set by framework debug methods. It is read by tests to
+  /// selectively ignore custom layout callbacks. It should not be set outside of
+  /// intrinsic-checking debug methods, and should not be checked in release mode
+  /// (where it will always be false).
   static bool debugCheckingIntrinsics = false;
+
   bool _debugSubtreeRelayoutRootAlreadyMarkedNeedsLayout() {
     if (_relayoutBoundary == null) {
       // We don't know where our relayout boundary is yet.

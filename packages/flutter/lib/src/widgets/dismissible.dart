@@ -97,7 +97,7 @@ class Dismissible extends StatefulWidget {
   /// dismissed item. Using keys causes the widgets to sync according to their
   /// keys and avoids this pitfall.
   const Dismissible({
-    required Key key,
+    required Key super.key,
     required this.child,
     this.background,
     this.secondaryBackground,
@@ -112,8 +112,7 @@ class Dismissible extends StatefulWidget {
     this.crossAxisEndOffset = 0.0,
     this.dragStartBehavior = DragStartBehavior.start,
     this.behavior = HitTestBehavior.opaque,
-  }) : assert(secondaryBackground == null || background != null),
-       super(key: key);
+  }) : assert(secondaryBackground == null || background != null);
 
   /// The widget below this widget in the tree.
   ///
@@ -341,12 +340,11 @@ class _DismissibleState extends State<Dismissible> with TickerProviderStateMixin
       return DismissDirection.none;
     }
     if (_directionIsXAxis) {
-      switch (Directionality.of(context)) {
-        case TextDirection.rtl:
-          return extent < 0 ? DismissDirection.startToEnd : DismissDirection.endToStart;
-        case TextDirection.ltr:
-          return extent > 0 ? DismissDirection.startToEnd : DismissDirection.endToStart;
-      }
+      return switch (Directionality.of(context)) {
+        TextDirection.rtl when extent < 0 => DismissDirection.startToEnd,
+        TextDirection.ltr when extent > 0 => DismissDirection.startToEnd,
+        TextDirection.rtl || TextDirection.ltr => DismissDirection.endToStart,
+      };
     }
     return extent > 0 ? DismissDirection.down : DismissDirection.up;
   }

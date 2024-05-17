@@ -489,7 +489,7 @@ class _SegmentedControlState<T> extends State<CupertinoSlidingSegmentedControl<T
     final int numOfChildren = widget.children.length;
     assert(renderBox.hasSize);
     assert(numOfChildren >= 2);
-    int index = (dx ~/ (renderBox.size.width / numOfChildren)).clamp(0, numOfChildren - 1); // ignore_clamp_double_lint
+    int index = (dx ~/ (renderBox.size.width / numOfChildren)).clamp(0, numOfChildren - 1);
 
     switch (Directionality.of(context)) {
       case TextDirection.ltr:
@@ -945,6 +945,18 @@ class _RenderSegmentedControl<T> extends RenderBox
   Size _computeOverallSizeFromChildSize(Size childSize, BoxConstraints constraints) {
     final int childCount = this.childCount ~/ 2 + 1;
     return constraints.constrain(Size(childSize.width * childCount + totalSeparatorWidth, childSize.height));
+  }
+
+  @override
+  double? computeDryBaseline(covariant BoxConstraints constraints, TextBaseline baseline) {
+    final Size childSize = _calculateChildSize(constraints);
+    final BoxConstraints childConstraints = BoxConstraints.tight(childSize);
+
+    BaselineOffset baselineOffset = BaselineOffset.noBaseline;
+    for (RenderBox? child = firstChild; child != null; child = childAfter(child)) {
+      baselineOffset = baselineOffset.minOf(BaselineOffset(child.getDryBaseline(childConstraints, baseline)));
+    }
+    return baselineOffset.offset;
   }
 
   @override

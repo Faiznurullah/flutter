@@ -1006,7 +1006,7 @@ abstract class State<T extends StatefulWidget> with Diagnosticable {
   void initState() {
     assert(_debugLifecycleState == _StateLifecycle.created);
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectCreated(
+      FlutterMemoryAllocations.instance.dispatchObjectCreated(
         library: _flutterWidgetsLibrary,
         className: '$State',
         object: this,
@@ -1303,13 +1303,18 @@ abstract class State<T extends StatefulWidget> with Diagnosticable {
   /// Implementations of this method should end with a call to the inherited
   /// method, as in `super.dispose()`.
   ///
-  /// ## Application shutdown
+  /// ## Caveats
   ///
-  /// This method is _not_ invoked when the application shuts down, because
-  /// there is no way to predict when that will happen. For example, a user's
-  /// battery could catch fire, or the user could drop the device into a
-  /// swimming pool, or the operating system could unilaterally terminate the
-  /// application process due to memory pressure.
+  /// This method is _not_ invoked at times where a developer might otherwise
+  /// expect it, such as application shutdown or dismissal via platform
+  /// native methods.
+  ///
+  /// ### Application shutdown
+  ///
+  /// There is no way to predict when application shutdown will happen. For
+  /// example, a user's battery could catch fire, or the user could drop the
+  /// device into a swimming pool, or the operating system could unilaterally
+  /// terminate the application process due to memory pressure.
   ///
   /// Applications are responsible for ensuring that they are well-behaved
   /// even in the face of a rapid unscheduled termination.
@@ -1319,6 +1324,11 @@ abstract class State<T extends StatefulWidget> with Diagnosticable {
   ///
   /// To listen for platform shutdown messages (and other lifecycle changes),
   /// consider the [AppLifecycleListener] API.
+  ///
+  /// {@macro flutter.widgets.runApp.dismissal}
+  ///
+  /// See the method used to bootstrap the app (e.g. [runApp] or [runWidget])
+  /// for suggestions on how to release resources more eagerly.
   ///
   /// See also:
   ///
@@ -1332,7 +1342,7 @@ abstract class State<T extends StatefulWidget> with Diagnosticable {
       return true;
     }());
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectDisposed(object: this);
+      FlutterMemoryAllocations.instance.dispatchObjectDisposed(object: this);
     }
   }
 
@@ -3184,14 +3194,11 @@ class BuildOwner {
                   keyStringCount[key] = 1;
                 }
               }
-              final List<String> keyLabels = <String>[];
-              keyStringCount.forEach((String key, int count) {
-                if (count == 1) {
-                  keyLabels.add(key);
-                } else {
-                  keyLabels.add('$key ($count different affected keys had this toString representation)');
-                }
-              });
+              final List<String> keyLabels = <String>[
+                for (final MapEntry<String, int>(:String key, value: int count) in keyStringCount.entries)
+                  if (count == 1) key
+                  else '$key ($count different affected keys had this toString representation)',
+              ];
               final Iterable<Element> elements = _debugElementsThatWillNeedToBeRebuiltDueToGlobalKeyShenanigans!.keys;
               final Map<String, int> elementStringCount = HashMap<String, int>();
               for (final String element in elements.map<String>((Element element) => element.toString())) {
@@ -3201,14 +3208,11 @@ class BuildOwner {
                   elementStringCount[element] = 1;
                 }
               }
-              final List<String> elementLabels = <String>[];
-              elementStringCount.forEach((String element, int count) {
-                if (count == 1) {
-                  elementLabels.add(element);
-                } else {
-                  elementLabels.add('$element ($count different affected elements had this toString representation)');
-                }
-              });
+              final List<String> elementLabels = <String>[
+                for (final MapEntry<String, int>(key: String element, value: int count) in elementStringCount.entries)
+                  if (count == 1) element
+                  else '$element ($count different affected elements had this toString representation)',
+              ];
               assert(keyLabels.isNotEmpty);
               final String the = keys.length == 1 ? ' the' : '';
               final String s = keys.length == 1 ? '' : 's';
@@ -3378,7 +3382,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   Element(Widget widget)
     : _widget = widget {
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectCreated(
+      FlutterMemoryAllocations.instance.dispatchObjectCreated(
         library: _flutterWidgetsLibrary,
         className: '$Element',
         object: this,
@@ -3753,7 +3757,9 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   ///
   /// See the [RenderObjectElement] documentation for more information on slots.
   @protected
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   Element? updateChild(Element? child, Widget? newWidget, Object? newSlot) {
     if (newWidget == null) {
       if (child != null) {
@@ -4275,7 +4281,9 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// The element returned by this function will already have been mounted and
   /// will be in the "active" lifecycle state.
   @protected
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   Element inflateWidget(Widget newWidget, Object? newSlot) {
     final bool isTimelineTracked = !kReleaseMode && _isProfileBuildsEnabledFor(newWidget);
     if (isTimelineTracked) {
@@ -4533,7 +4541,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     assert(_widget != null); // Use the private property to avoid a CastError during hot reload.
     assert(owner != null);
     if (kFlutterMemoryAllocationsEnabled) {
-      MemoryAllocations.instance.dispatchObjectDisposed(object: this);
+      FlutterMemoryAllocations.instance.dispatchObjectDisposed(object: this);
     }
     // Use the private property to avoid a CastError during hot reload.
     final Key? key = _widget?.key;
@@ -5157,7 +5165,9 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// Another example is the [AnimatedBuilder.child] property, which allows the
   /// non-animating parts of a subtree to remain static even as the
   /// [AnimatedBuilder.builder] callback recreates the other components.
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   void rebuild({bool force = false}) {
     assert(_lifecycleState != _ElementLifecycle.initial);
     if (_lifecycleState != _ElementLifecycle.active || (!_dirty && !force)) {
@@ -5845,11 +5855,13 @@ class ParentDataElement<T extends ParentData> extends ProxyElement {
     void applyParentDataToChild(Element child) {
       if (child is RenderObjectElement) {
         child._updateParentData(widget);
-      } else {
-        child.visitChildren(applyParentDataToChild);
+      } else if (child.renderObjectAttachingChild != null) {
+        applyParentDataToChild(child.renderObjectAttachingChild!);
       }
     }
-    visitChildren(applyParentDataToChild);
+    if (renderObjectAttachingChild != null) {
+      applyParentDataToChild(renderObjectAttachingChild!);
+    }
   }
 
   /// Calls [ParentDataWidget.applyParentData] on the given widget, passing it
@@ -6473,7 +6485,9 @@ abstract class RenderObjectElement extends Element {
     _performRebuild(); // calls widget.updateRenderObject()
   }
 
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   void _performRebuild() {
     assert(() {
       _debugDoingBuild = true;
@@ -6526,7 +6540,7 @@ abstract class RenderObjectElement extends Element {
             ErrorSummary('Incorrect use of ParentDataWidget.'),
             ...parentDataWidget._debugDescribeIncorrectParentDataType(
               parentData: renderObject.parentData,
-              parentDataCreator: _ancestorRenderObjectElement!.widget as RenderObjectWidget,
+              parentDataCreator: _ancestorRenderObjectElement?.widget as RenderObjectWidget?,
               ownershipChain: ErrorDescription(debugGetCreatorChain(10)),
             ),
           ]);
@@ -6961,9 +6975,16 @@ abstract class RenderTreeRootElement extends RenderObjectElement {
             'however, expects that a child will be attached.',
           ),
           ErrorHint(
-            'Try moving the subtree that contains the ${toStringShort()} widget into the '
-            'view property of a ViewAnchor widget or to the root of the widget tree, where '
-            'it is not expected to attach its RenderObject to a parent.',
+            'Try moving the subtree that contains the ${toStringShort()} widget '
+            'to a location where it is not expected to attach its RenderObject '
+            'to a parent. This could mean moving the subtree into the view '
+            'property of a "ViewAnchor" widget or - if the subtree is the root of '
+            'your widget tree - passing it to "runWidget" instead of "runApp".',
+          ),
+          ErrorHint(
+            'If you are seeing this error in a test and the subtree containing '
+            'the ${toStringShort()} widget is passed to "WidgetTester.pumpWidget", '
+            'consider setting the "wrapWithView" parameter of that method to false.'
           ),
         ],
       );

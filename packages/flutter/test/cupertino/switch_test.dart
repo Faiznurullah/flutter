@@ -17,7 +17,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 void main() {
-  testWidgetsWithLeakTracking('Switch can toggle on tap', (WidgetTester tester) async {
+  testWidgets('Switch can toggle on tap',
+    // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
+    experimentalLeakTesting: LeakTesting.settings.withTracked(classes: const <String>['CurvedAnimation']),
+    (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -47,7 +50,7 @@ void main() {
     expect(value, isTrue);
   });
 
-  testWidgetsWithLeakTracking('CupertinoSwitch can be toggled by keyboard shortcuts', (WidgetTester tester) async {
+  testWidgets('CupertinoSwitch can be toggled by keyboard shortcuts', (WidgetTester tester) async {
     bool value = true;
     Widget buildApp({bool enabled = true}) {
       return CupertinoApp(
@@ -80,7 +83,7 @@ void main() {
     expect(value, isTrue);
   });
 
-  testWidgetsWithLeakTracking('Switch emits light haptic vibration on tap', (WidgetTester tester) async {
+  testWidgets('Switch emits light haptic vibration on tap', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
 
@@ -120,7 +123,7 @@ void main() {
     expect(log.single, isMethodCall('HapticFeedback.vibrate', arguments: 'HapticFeedbackType.lightImpact'));
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgetsWithLeakTracking('Using other widgets that rebuild the switch will not cause vibrations', (WidgetTester tester) async {
+  testWidgets('Using other widgets that rebuild the switch will not cause vibrations', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     final Key switchKey2 = UniqueKey();
     bool value = false;
@@ -191,7 +194,7 @@ void main() {
     expect(log[3], isMethodCall('HapticFeedback.vibrate', arguments: 'HapticFeedbackType.lightImpact'));
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgetsWithLeakTracking('Haptic vibration triggers on drag', (WidgetTester tester) async {
+  testWidgets('Haptic vibration triggers on drag', (WidgetTester tester) async {
     bool value = false;
     final List<MethodCall> log = <MethodCall>[];
 
@@ -229,7 +232,7 @@ void main() {
     expect(log[0], isMethodCall('HapticFeedback.vibrate', arguments: 'HapticFeedbackType.lightImpact'));
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgetsWithLeakTracking('No haptic vibration triggers from a programmatic value change', (WidgetTester tester) async {
+  testWidgets('No haptic vibration triggers from a programmatic value change', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
 
@@ -281,7 +284,7 @@ void main() {
     expect(log, hasLength(0));
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgetsWithLeakTracking('Switch can drag (LTR)', (WidgetTester tester) async {
+  testWidgets('Switch can drag (LTR)', (WidgetTester tester) async {
     bool value = false;
 
     await tester.pumpWidget(
@@ -325,7 +328,7 @@ void main() {
     expect(value, isFalse);
   });
 
-  testWidgetsWithLeakTracking('Switch can drag with dragStartBehavior', (WidgetTester tester) async {
+  testWidgets('Switch can drag with dragStartBehavior', (WidgetTester tester) async {
     bool value = false;
 
     await tester.pumpWidget(
@@ -411,7 +414,7 @@ void main() {
     await tester.pump();
   });
 
-  testWidgetsWithLeakTracking('Switch can drag (RTL)', (WidgetTester tester) async {
+  testWidgets('Switch can drag (RTL)', (WidgetTester tester) async {
     bool value = false;
 
     await tester.pumpWidget(
@@ -456,7 +459,7 @@ void main() {
     expect(value, isFalse);
   });
 
-  testWidgetsWithLeakTracking('can veto switch dragging result', (WidgetTester tester) async {
+  testWidgets('can veto switch dragging result', (WidgetTester tester) async {
     bool value = false;
 
     await tester.pumpWidget(
@@ -491,7 +494,6 @@ void main() {
     await gesture.up();
     await tester.pump();
     expect(value, isFalse);
-    // ignore: avoid_dynamic_calls
     final CurvedAnimation position = (tester.state(find.byType(CupertinoSwitch)) as dynamic).position as CurvedAnimation;
     expect(position.value, lessThan(0.5));
     await tester.pump();
@@ -528,7 +530,7 @@ void main() {
     expect(position.value, 1.0);
   });
 
-  testWidgetsWithLeakTracking('Switch is translucent when disabled', (WidgetTester tester) async {
+  testWidgets('Switch is translucent when disabled', (WidgetTester tester) async {
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
@@ -546,7 +548,7 @@ void main() {
     expect(tester.widget<Opacity>(find.byType(Opacity).first).opacity, 0.5);
   });
 
-  testWidgetsWithLeakTracking('Switch is using track color when set', (WidgetTester tester) async {
+  testWidgets('Switch is using track color when set', (WidgetTester tester) async {
     const Color trackColor = Color(0xFF00FF00);
 
     await tester.pumpWidget(
@@ -568,7 +570,7 @@ void main() {
     expect(find.byType(CupertinoSwitch), paints..rrect(color: trackColor));
   });
 
-  testWidgetsWithLeakTracking('Switch is using default thumb color', (WidgetTester tester) async {
+  testWidgets('Switch is using default thumb color', (WidgetTester tester) async {
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
@@ -594,7 +596,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Switch is using thumb color when set', (WidgetTester tester) async {
+  testWidgets('Switch is using thumb color when set', (WidgetTester tester) async {
     const Color thumbColor = Color(0xFF000000);
     await tester.pumpWidget(
       const Directionality(
@@ -622,7 +624,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Switch is opaque when enabled', (WidgetTester tester) async {
+  testWidgets('Switch is opaque when enabled', (WidgetTester tester) async {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
@@ -640,7 +642,7 @@ void main() {
     expect(tester.widget<Opacity>(find.byType(Opacity).first).opacity, 1.0);
   });
 
-  testWidgetsWithLeakTracking('Switch turns translucent after becoming disabled', (WidgetTester tester) async {
+  testWidgets('Switch turns translucent after becoming disabled', (WidgetTester tester) async {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
@@ -671,7 +673,7 @@ void main() {
     expect(tester.widget<Opacity>(find.byType(Opacity).first).opacity, 0.5);
   });
 
-  testWidgetsWithLeakTracking('Switch turns opaque after becoming enabled', (WidgetTester tester) async {
+  testWidgets('Switch turns opaque after becoming enabled', (WidgetTester tester) async {
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
@@ -702,7 +704,7 @@ void main() {
     expect(tester.widget<Opacity>(find.byType(Opacity).first).opacity, 1.0);
   });
 
-  testWidgetsWithLeakTracking('Switch renders correctly before, during, and after being tapped', (WidgetTester tester) async {
+  testWidgets('Switch renders correctly before, during, and after being tapped', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -780,7 +782,7 @@ void main() {
           style: PaintingStyle.stroke,
         );
 
-  testWidgetsWithLeakTracking('Switch renders switch labels correctly before, during, and after being tapped', (WidgetTester tester) async {
+  testWidgets('Switch renders switch labels correctly before, during, and after being tapped', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -830,7 +832,7 @@ void main() {
     expect(switchRenderObject, offLabelPaintPattern(alpha: 0));
   });
 
-  testWidgetsWithLeakTracking('Switch renders switch labels correctly before, during, and after being tapped in high contrast', (WidgetTester tester) async {
+  testWidgets('Switch renders switch labels correctly before, during, and after being tapped in high contrast', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -883,7 +885,7 @@ void main() {
     expect(switchRenderObject, offLabelPaintPattern(highContrast: true, alpha: 0));
   });
 
-  testWidgetsWithLeakTracking('Switch renders switch labels correctly before, during, and after being tapped with direction rtl', (WidgetTester tester) async {
+  testWidgets('Switch renders switch labels correctly before, during, and after being tapped with direction rtl', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -933,7 +935,7 @@ void main() {
     expect(switchRenderObject, offLabelPaintPattern(isRtl: true, alpha: 0));
   });
 
-  testWidgetsWithLeakTracking('Switch renders correctly in dark mode', (WidgetTester tester) async {
+  testWidgets('Switch renders correctly in dark mode', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -978,7 +980,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Switch can apply the ambient theme and be opted out', (WidgetTester tester) async {
+  testWidgets('Switch can apply the ambient theme and be opted out', (WidgetTester tester) async {
     final Key switchKey = UniqueKey();
     bool value = false;
     await tester.pumpWidget(
@@ -1038,7 +1040,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Hovering over Cupertino switch updates cursor to clickable on Web', (WidgetTester tester) async {
+  testWidgets('Hovering over Cupertino switch updates cursor to clickable on Web', (WidgetTester tester) async {
     const bool value = false;
     // Disabled CupertinoSwitch does not update cursor on Web.
     await tester.pumpWidget(
@@ -1094,7 +1096,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('CupertinoSwitch is focusable and has correct focus color', (WidgetTester tester) async {
+  testWidgets('CupertinoSwitch is focusable and has correct focus color', (WidgetTester tester) async {
     final FocusNode focusNode = FocusNode(debugLabel: 'CupertinoSwitch');
     addTearDown(focusNode.dispose);
     tester.binding.focusManager.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
@@ -1176,7 +1178,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('CupertinoSwitch.onFocusChange callback', (WidgetTester tester) async {
+  testWidgets('CupertinoSwitch.onFocusChange callback', (WidgetTester tester) async {
     final FocusNode focusNode = FocusNode(debugLabel: 'CupertinoSwitch');
     addTearDown(focusNode.dispose);
     bool focused = false;

@@ -15,7 +15,7 @@ import '../../src/common.dart';
 import '../../src/fakes.dart';
 
 void main() {
-  late FileSystem fileSystem;
+  late MemoryFileSystem fileSystem;
   late FakeAnalytics fakeAnalytics;
 
   setUp(() {
@@ -431,7 +431,7 @@ void main() {
         'gradle',
         label: 'gradle-expected-file-not-found',
         parameters: CustomDimensions.fromMap(<String, String> {
-          'cd37': 'androidGradlePluginVersion: 7.5, fileExtension: .aab',
+          'cd37': 'androidGradlePluginVersion: 7.6.3, fileExtension: .aab',
         }),
       ),
     ));
@@ -442,7 +442,7 @@ void main() {
         Event.flutterBuildInfo(
           label: 'gradle-expected-file-not-found',
           buildType: 'gradle',
-          settings: 'androidGradlePluginVersion: 7.5, fileExtension: .aab',
+          settings: 'androidGradlePluginVersion: 7.6.3, fileExtension: .aab',
         ),
       ),
     );

@@ -243,10 +243,27 @@ class UnderlineInputBorder extends InputBorder {
     double gapPercentage = 0.0,
     TextDirection? textDirection,
   }) {
-    if (borderRadius.bottomLeft != Radius.zero || borderRadius.bottomRight != Radius.zero) {
-      canvas.clipPath(getOuterPath(rect, textDirection: textDirection));
+    if (borderSide.style == BorderStyle.none) {
+      return;
     }
-    canvas.drawLine(rect.bottomLeft, rect.bottomRight, borderSide.toPaint());
+
+    if (borderRadius.bottomLeft != Radius.zero || borderRadius.bottomRight != Radius.zero) {
+      // This prevents the border from leaking the color due to anti-aliasing rounding errors.
+      final BorderRadius updatedBorderRadius = BorderRadius.only(
+        bottomLeft: borderRadius.bottomLeft.clamp(maximum: Radius.circular(rect.height / 2)),
+        bottomRight: borderRadius.bottomRight.clamp(maximum: Radius.circular(rect.height / 2)),
+      );
+
+      BoxBorder.paintNonUniformBorder(canvas, rect,
+        textDirection: textDirection,
+        borderRadius: updatedBorderRadius,
+        bottom: borderSide.copyWith(strokeAlign: BorderSide.strokeAlignInside),
+        color: borderSide.color,
+      );
+    } else {
+      final Offset alignInsideOffset = Offset(0, borderSide.width / 2);
+      canvas.drawLine(rect.bottomLeft - alignInsideOffset, rect.bottomRight - alignInsideOffset, borderSide.toPaint());
+    }
   }
 
   @override

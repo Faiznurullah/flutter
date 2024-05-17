@@ -370,14 +370,11 @@ class Draggable<T extends Object> extends StatefulWidget {
   /// recognizing a drag.
   @protected
   MultiDragGestureRecognizer createRecognizer(GestureMultiDragStartCallback onStart) {
-    switch (affinity) {
-      case Axis.horizontal:
-        return HorizontalMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter)..onStart = onStart;
-      case Axis.vertical:
-        return VerticalMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter)..onStart = onStart;
-      case null:
-        return ImmediateMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter)..onStart = onStart;
-    }
+    return switch (affinity) {
+      Axis.horizontal => HorizontalMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter),
+      Axis.vertical   => VerticalMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter),
+      null            => ImmediateMultiDragGestureRecognizer(allowedButtonsFilter: allowedButtonsFilter),
+    }..onStart = onStart;
   }
 
   @override
@@ -414,6 +411,8 @@ class LongPressDraggable<T extends Object> extends Draggable<T> {
     super.ignoringFeedbackPointer,
     this.delay = kLongPressTimeout,
     super.allowedButtonsFilter,
+    super.hitTestBehavior,
+    super.rootOverlay,
   });
 
   /// Whether haptic feedback should be triggered on drag start.
@@ -611,8 +610,18 @@ class DragTarget<T extends Object> extends StatefulWidget {
   const DragTarget({
     super.key,
     required this.builder,
+    @Deprecated(
+      'Use onWillAcceptWithDetails instead. '
+      'This callback is similar to onWillAcceptWithDetails but does not provide drag details. '
+      'This feature was deprecated after v3.14.0-0.2.pre.'
+    )
     this.onWillAccept,
     this.onWillAcceptWithDetails,
+    @Deprecated(
+      'Use onAcceptWithDetails instead. '
+      'This callback is similar to onAcceptWithDetails but does not provide drag details. '
+      'This feature was deprecated after v3.14.0-0.2.pre.'
+    )
     this.onAccept,
     this.onAcceptWithDetails,
     this.onLeave,
@@ -636,6 +645,11 @@ class DragTarget<T extends Object> extends StatefulWidget {
   /// Equivalent to [onWillAcceptWithDetails], but only includes the data.
   ///
   /// Must not be provided if [onWillAcceptWithDetails] is provided.
+  @Deprecated(
+    'Use onWillAcceptWithDetails instead. '
+    'This callback is similar to onWillAcceptWithDetails but does not provide drag details. '
+    'This feature was deprecated after v3.14.0-0.2.pre.'
+  )
   final DragTargetWillAccept<T>? onWillAccept;
 
   /// Called to determine whether this widget is interested in receiving a given
@@ -655,6 +669,11 @@ class DragTarget<T extends Object> extends StatefulWidget {
   /// It will not be called if `data` is `null`.
   ///
   /// Equivalent to [onAcceptWithDetails], but only includes the data.
+  @Deprecated(
+    'Use onAcceptWithDetails instead. '
+    'This callback is similar to onAcceptWithDetails but does not provide drag details. '
+    'This feature was deprecated after v3.14.0-0.2.pre.'
+  )
   final DragTargetAccept<T>? onAccept;
 
   /// Called when an acceptable piece of data was dropped over this drag target.
@@ -889,17 +908,12 @@ class _DragAvatar<T extends Object> extends Drag {
   Iterable<_DragTargetState<Object>> _getDragTargets(Iterable<HitTestEntry> path) {
     // Look for the RenderBoxes that corresponds to the hit target (the hit target
     // widgets build RenderMetaData boxes for us for this purpose).
-    final List<_DragTargetState<Object>> targets = <_DragTargetState<Object>>[];
-    for (final HitTestEntry entry in path) {
-      final HitTestTarget target = entry.target;
-      if (target is RenderMetaData) {
-        final dynamic metaData = target.metaData;
-        if (metaData is _DragTargetState && metaData.isExpectedDataType(data, T)) {
-          targets.add(metaData);
-        }
-      }
-    }
-    return targets;
+    return <_DragTargetState<Object>>[
+      for (final HitTestEntry entry in path)
+        if (entry.target case final RenderMetaData target)
+          if (target.metaData case final _DragTargetState<Object> metaData)
+            if (metaData.isExpectedDataType(data, T)) metaData,
+    ];
   }
 
   void _leaveAllEntered() {
@@ -951,12 +965,10 @@ class _DragAvatar<T extends Object> extends Drag {
   }
 
   Offset _restrictAxis(Offset offset) {
-    if (axis == null) {
-      return offset;
-    }
-    if (axis == Axis.horizontal) {
-      return Offset(offset.dx, 0.0);
-    }
-    return Offset(0.0, offset.dy);
+    return switch (axis) {
+      Axis.horizontal => Offset(offset.dx, 0.0),
+      Axis.vertical   => Offset(0.0, offset.dy),
+      null => offset,
+    };
   }
 }

@@ -118,14 +118,45 @@ class _DropdownMenuItemButton<T> extends StatefulWidget {
 }
 
 class _DropdownMenuItemButtonState<T> extends State<_DropdownMenuItemButton<T>> {
-  void _handleFocusChange(bool focused) {
-    final bool inTraditionalMode;
-    switch (FocusManager.instance.highlightMode) {
-      case FocusHighlightMode.touch:
-        inTraditionalMode = false;
-      case FocusHighlightMode.traditional:
-        inTraditionalMode = true;
+  CurvedAnimation? _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _setOpacityAnimation();
+  }
+
+  @override
+  void didUpdateWidget(_DropdownMenuItemButton<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.itemIndex != widget.itemIndex ||
+        oldWidget.route.animation != widget.route.animation ||
+        oldWidget.route.selectedIndex != widget.route.selectedIndex ||
+        widget.route.items.length != oldWidget.route.items.length) {
+      _setOpacityAnimation();
     }
+  }
+
+  void _setOpacityAnimation() {
+    _opacityAnimation?.dispose();
+    final double unit = 0.5 / (widget.route.items.length + 1.5);
+    if (widget.itemIndex == widget.route.selectedIndex) {
+      _opacityAnimation = CurvedAnimation(
+          parent: widget.route.animation!, curve: const Threshold(0.0));
+    } else {
+      final double start =
+          clampDouble(0.5 + (widget.itemIndex + 1) * unit, 0.0, 1.0);
+      final double end = clampDouble(start + 1.5 * unit, 0.0, 1.0);
+      _opacityAnimation = CurvedAnimation(
+          parent: widget.route.animation!, curve: Interval(start, end));
+    }
+  }
+
+  void _handleFocusChange(bool focused) {
+    final bool inTraditionalMode = switch (FocusManager.instance.highlightMode) {
+      FocusHighlightMode.touch       => false,
+      FocusHighlightMode.traditional => true,
+    };
 
     if (focused && inTraditionalMode) {
       final _MenuLimits menuLimits = widget.route.getMenuLimits(
@@ -160,22 +191,20 @@ class _DropdownMenuItemButtonState<T> extends State<_DropdownMenuItemButton<T>> 
   };
 
   @override
+  void dispose() {
+    _opacityAnimation?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final DropdownMenuItem<T> dropdownMenuItem = widget.route.items[widget.itemIndex].item!;
-    final CurvedAnimation opacity;
-    final double unit = 0.5 / (widget.route.items.length + 1.5);
-    if (widget.itemIndex == widget.route.selectedIndex) {
-      opacity = CurvedAnimation(parent: widget.route.animation!, curve: const Threshold(0.0));
-    } else {
-      final double start = clampDouble(0.5 + (widget.itemIndex + 1) * unit, 0.0, 1.0);
-      final double end = clampDouble(start + 1.5 * unit, 0.0, 1.0);
-      opacity = CurvedAnimation(parent: widget.route.animation!, curve: Interval(start, end));
+    final DropdownMenuItem<T> dropdownMenuItem =
+        widget.route.items[widget.itemIndex].item!;
+    Widget child = widget.route.items[widget.itemIndex];
+    if (widget.padding case final EdgeInsetsGeometry padding) {
+      child = Padding(padding: padding, child: child);
     }
-    Widget child = Container(
-      padding: widget.padding,
-      height: widget.route.itemHeight,
-      child: widget.route.items[widget.itemIndex],
-    );
+    child = SizedBox(height: widget.route.itemHeight, child: child);
     // An [InkWell] is added to the item only if it is enabled
     if (dropdownMenuItem.enabled) {
       child = InkWell(
@@ -186,7 +215,7 @@ class _DropdownMenuItemButtonState<T> extends State<_DropdownMenuItemButton<T>> 
         child: child,
       );
     }
-    child = FadeTransition(opacity: opacity, child: child);
+    child = FadeTransition(opacity: _opacityAnimation!, child: child);
     if (kIsWeb && dropdownMenuItem.enabled) {
       child = Shortcuts(
         shortcuts: _webShortcuts,
@@ -224,8 +253,8 @@ class _DropdownMenu<T> extends StatefulWidget {
 }
 
 class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
-  late CurvedAnimation _fadeOpacity;
-  late CurvedAnimation _resize;
+  late final CurvedAnimation _fadeOpacity;
+  late final CurvedAnimation _resize;
 
   @override
   void initState() {
@@ -244,6 +273,13 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
       curve: const Interval(0.25, 0.5),
       reverseCurve: const Threshold(0.0),
     );
+  }
+
+  @override
+  void dispose() {
+    _fadeOpacity.dispose();
+    _resize.dispose();
+    super.dispose();
   }
 
   @override
@@ -377,13 +413,10 @@ class _DropdownMenuRouteLayout<T> extends SingleChildLayoutDelegate {
       return true;
     }());
     assert(textDirection != null);
-    final double left;
-    switch (textDirection!) {
-      case TextDirection.rtl:
-        left = clampDouble(buttonRect.right, 0.0, size.width) - childSize.width;
-      case TextDirection.ltr:
-        left = clampDouble(buttonRect.left, 0.0, size.width - childSize.width);
-    }
+    final double left = switch (textDirection!) {
+      TextDirection.rtl => clampDouble(buttonRect.right, 0.0, size.width) - childSize.width,
+      TextDirection.ltr => clampDouble(buttonRect.left, 0.0, size.width - childSize.width),
+    };
 
     return Offset(left, menuLimits.top);
   }
@@ -742,10 +775,9 @@ class _DropdownMenuItemContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: _kMenuItemHeight),
-      alignment: alignment,
-      child: child,
+      child: Align(alignment: alignment, child: child),
     );
   }
 }
@@ -867,7 +899,7 @@ class DropdownButtonHideUnderline extends InheritedWidget {
 /// {@tool dartpad}
 /// This sample shows a [DropdownButton] with a large arrow icon,
 /// purple text style, and bold purple underline, whose value is one of "One",
-/// "Two", "Free", or "Four".
+/// "Two", "Three", or "Four".
 ///
 /// ![](https://flutter.github.io/assets-for-api-docs/assets/material/dropdown_button.png)
 ///
@@ -1379,28 +1411,17 @@ class _DropdownButtonState<T> extends State<DropdownButton<T>> with WidgetsBindi
 
   Color get _iconColor {
     // These colors are not defined in the Material Design spec.
+    final Brightness brightness = Theme.of(context).brightness;
     if (_enabled) {
-      if (widget.iconEnabledColor != null) {
-        return widget.iconEnabledColor!;
-      }
-
-      switch (Theme.of(context).brightness) {
-        case Brightness.light:
-          return Colors.grey.shade700;
-        case Brightness.dark:
-          return Colors.white70;
-      }
+      return widget.iconEnabledColor ?? switch (brightness) {
+        Brightness.light => Colors.grey.shade700,
+        Brightness.dark  => Colors.white70,
+      };
     } else {
-      if (widget.iconDisabledColor != null) {
-        return widget.iconDisabledColor!;
-      }
-
-      switch (Theme.of(context).brightness) {
-        case Brightness.light:
-          return Colors.grey.shade400;
-        case Brightness.dark:
-          return Colors.white10;
-      }
+      return widget.iconDisabledColor ?? switch (brightness) {
+        Brightness.light => Colors.grey.shade400,
+        Brightness.dark  => Colors.white10,
+      };
     }
   }
 
@@ -1478,25 +1499,27 @@ class _DropdownButtonState<T> extends State<DropdownButton<T>> with WidgetsBindi
 
     Widget result = DefaultTextStyle(
       style: _enabled ? _textStyle! : _textStyle!.copyWith(color: Theme.of(context).disabledColor),
-      child: Container(
-        padding: padding.resolve(Directionality.of(context)),
+      child: SizedBox(
         height: widget.isDense ? _denseButtonHeight : null,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (widget.isExpanded)
-              Expanded(child: innerItemsWidget)
-            else
-              innerItemsWidget,
-            IconTheme(
-              data: IconThemeData(
-                color: _iconColor,
-                size: widget.iconSize,
+        child: Padding(
+          padding: padding.resolve(Directionality.of(context)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (widget.isExpanded)
+                Expanded(child: innerItemsWidget)
+              else
+                innerItemsWidget,
+              IconTheme(
+                data: IconThemeData(
+                  color: _iconColor,
+                  size: widget.iconSize,
+                ),
+                child: widget.icon ?? defaultIcon,
               ),
-              child: widget.icon ?? defaultIcon,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1571,6 +1594,8 @@ class _DropdownButtonState<T> extends State<DropdownButton<T>> with WidgetsBindi
 /// save, reset, or validate multiple fields at once. To use without a [Form],
 /// pass a [GlobalKey] to the constructor and use [GlobalKey.currentState] to
 /// save or reset the form field.
+///
+/// The `value` parameter maps to [FormField.initialValue].
 ///
 /// See also:
 ///
@@ -1741,7 +1766,7 @@ class _DropdownButtonFormFieldState<T> extends FormFieldState<T> {
   @override
   void didChange(T? value) {
     super.didChange(value);
-    _dropdownButtonFormField.onChanged!(value);
+    _dropdownButtonFormField.onChanged?.call(value);
   }
 
   @override
@@ -1755,6 +1780,6 @@ class _DropdownButtonFormFieldState<T> extends FormFieldState<T> {
  @override
   void reset() {
     super.reset();
-    _dropdownButtonFormField.onChanged!(value);
+    _dropdownButtonFormField.onChanged?.call(value);
   }
 }

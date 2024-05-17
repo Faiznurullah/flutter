@@ -47,7 +47,7 @@ class _TestSliverPersistentHeaderDelegate extends SliverPersistentHeaderDelegate
 }
 
 void main() {
-  testWidgetsWithLeakTracking('Scrollable widget scrollDirection update test', (WidgetTester tester) async {
+  testWidgets('Scrollable widget scrollDirection update test', (WidgetTester tester) async {
     final ScrollController controller = ScrollController();
     addTearDown(controller.dispose);
     Widget buildFrame(Axis axis) {
@@ -92,7 +92,7 @@ void main() {
     expect(controller.position.pixels, 0.0);
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal - down', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal - down', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     List<Widget> children;
@@ -138,7 +138,7 @@ void main() {
     expect(revealed.rect, const Rect.fromLTWH(40.0, 190.0, 10.0, 10.0));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal - right', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal - right', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     List<Widget> children;
@@ -186,7 +186,7 @@ void main() {
     expect(revealed.rect, const Rect.fromLTWH(190.0, 40.0, 10.0, 10.0));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal - up', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal - up', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     List<Widget> children;
@@ -234,7 +234,7 @@ void main() {
     expect(revealed.rect, const Rect.fromLTWH(40.0, 0.0, 10.0, 10.0));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal - left', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal - left', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     List<Widget> children;
@@ -283,7 +283,7 @@ void main() {
     expect(revealed.rect, const Rect.fromLTWH(0.0, 40.0, 10.0, 10.0));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - down', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - down', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     final List<Widget> children = <Widget>[];
@@ -331,7 +331,7 @@ void main() {
     expect(revealed.offset, 5 * (100 + 22 + 23) + 22 - (200 - 4));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - right', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - right', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     final List<Widget> children = <Widget>[];
@@ -380,7 +380,7 @@ void main() {
     expect(revealed.offset, 5 * (100 + 22 + 23) + 22 - (200 - 3));
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - up', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - up', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     final List<Widget> children = <Widget>[];
@@ -430,7 +430,7 @@ void main() {
     expect(revealed.offset, - 200 + 6 * (100 + 22 + 23) - 22 - 2);
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - up - reverse growth', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - up - reverse growth', (WidgetTester tester) async {
     const Key centerKey = ValueKey<String>('center');
     const EdgeInsets padding = EdgeInsets.only(top: 22.0, bottom: 23.0);
     const Widget centerSliver = SliverPadding(
@@ -487,7 +487,7 @@ void main() {
     expect(revealed.offset, -200 - 22 - 2);
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - left - reverse growth', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - left - reverse growth', (WidgetTester tester) async {
     const Key centerKey = ValueKey<String>('center');
     const EdgeInsets padding = EdgeInsets.only(left: 22.0, right: 23.0);
     const Widget centerSliver = SliverPadding(
@@ -545,7 +545,7 @@ void main() {
     expect(revealed.offset, - 300 - 22 - 1);
   });
 
-  testWidgetsWithLeakTracking('Viewport getOffsetToReveal Sliver - left', (WidgetTester tester) async {
+  testWidgets('Viewport getOffsetToReveal Sliver - left', (WidgetTester tester) async {
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
     final List<Widget> children = <Widget>[];
@@ -595,7 +595,7 @@ void main() {
     expect(revealed.offset, -200  + 6 * (100 + 22 + 23) - 22 - 1);
   });
 
-  testWidgetsWithLeakTracking('Nested Viewports showOnScreen', (WidgetTester tester) async {
+  testWidgets('Nested Viewports showOnScreen', (WidgetTester tester) async {
     final List<ScrollController> controllersX = List<ScrollController>.generate(10, (int i) => ScrollController(initialScrollOffset: 400.0));
     final ScrollController controllerY = ScrollController(initialScrollOffset: 400.0);
 
@@ -806,7 +806,7 @@ void main() {
       );
     }
 
-    testWidgetsWithLeakTracking('Reverse List showOnScreen', (WidgetTester tester) async {
+    testWidgets('Reverse List showOnScreen', (WidgetTester tester) async {
       addTearDown(tester.view.reset);
       const double screenHeight = 400.0;
       const double screenWidth = 400.0;
@@ -872,7 +872,7 @@ void main() {
       expect(find.text('Item -1'), findsOneWidget);
     });
 
-    testWidgetsWithLeakTracking('in view in inner, but not in outer', (WidgetTester tester) async {
+    testWidgets('in view in inner, but not in outer', (WidgetTester tester) async {
       final ScrollController inner = ScrollController();
       final ScrollController outer = ScrollController();
       addTearDown(inner.dispose);
@@ -892,7 +892,7 @@ void main() {
       expect(outer.offset, 100.0);
     });
 
-    testWidgetsWithLeakTracking('not in view of neither inner nor outer', (WidgetTester tester) async {
+    testWidgets('not in view of neither inner nor outer', (WidgetTester tester) async {
       final ScrollController inner = ScrollController();
       final ScrollController outer = ScrollController();
       addTearDown(inner.dispose);
@@ -912,7 +912,7 @@ void main() {
       expect(outer.offset, 200.0);
     });
 
-    testWidgetsWithLeakTracking('in view in inner and outer', (WidgetTester tester) async {
+    testWidgets('in view in inner and outer', (WidgetTester tester) async {
       final ScrollController inner = ScrollController(initialScrollOffset: 200.0);
       final ScrollController outer = ScrollController(initialScrollOffset: 200.0);
       addTearDown(inner.dispose);
@@ -932,7 +932,7 @@ void main() {
       expect(inner.offset, 200.0);
     });
 
-    testWidgetsWithLeakTracking('inner shown in outer, but item not visible', (WidgetTester tester) async {
+    testWidgets('inner shown in outer, but item not visible', (WidgetTester tester) async {
       final ScrollController inner = ScrollController(initialScrollOffset: 200.0);
       final ScrollController outer = ScrollController(initialScrollOffset: 200.0);
       addTearDown(inner.dispose);
@@ -952,7 +952,7 @@ void main() {
       expect(inner.offset, 400.0);
     });
 
-    testWidgetsWithLeakTracking('inner half shown in outer, item only visible in inner', (WidgetTester tester) async {
+    testWidgets('inner half shown in outer, item only visible in inner', (WidgetTester tester) async {
       final ScrollController inner = ScrollController();
       final ScrollController outer = ScrollController(initialScrollOffset: 100.0);
       addTearDown(inner.dispose);
@@ -973,7 +973,7 @@ void main() {
     });
   });
 
-  testWidgetsWithLeakTracking('Nested Viewports showOnScreen with allowImplicitScrolling=false for inner viewport', (WidgetTester tester) async {
+  testWidgets('Nested Viewports showOnScreen with allowImplicitScrolling=false for inner viewport', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/20893.
 
     List<Widget> slivers;
@@ -1027,7 +1027,7 @@ void main() {
     expect(controllerY.offset, 50.0);
   });
 
-  testWidgetsWithLeakTracking('Nested Viewports showOnScreen on Sliver with allowImplicitScrolling=false for inner viewport', (WidgetTester tester) async {
+  testWidgets('Nested Viewports showOnScreen on Sliver with allowImplicitScrolling=false for inner viewport', (WidgetTester tester) async {
     Widget sliver;
     final ScrollController controllerX = ScrollController();
     final ScrollController controllerY = ScrollController();
@@ -1089,7 +1089,7 @@ void main() {
     expect(controllerY.offset, 25.0);
   });
 
-  testWidgetsWithLeakTracking('Viewport showOnScreen with objects larger than viewport', (WidgetTester tester) async {
+  testWidgets('Viewport showOnScreen with objects larger than viewport', (WidgetTester tester) async {
     List<Widget> children;
     final ScrollController controller = ScrollController(initialScrollOffset: 300.0);
     addTearDown(controller.dispose);
@@ -1150,7 +1150,7 @@ void main() {
     expect(controller.offset, 300.0);
   });
 
-  testWidgetsWithLeakTracking(
+  testWidgets(
     'Viewport showOnScreen should not scroll if the rect is already visible, even if it does not scroll linearly',
     (WidgetTester tester) async {
       List<Widget> children;
@@ -1260,16 +1260,14 @@ void main() {
       }
 
       final RenderBox renderBox = renderObject as RenderBox;
-      switch (axis) {
-        case Axis.horizontal:
-          return renderBox.size.width;
-        case Axis.vertical:
-          return renderBox.size.height;
-      }
+      return switch (axis) {
+        Axis.horizontal => renderBox.size.width,
+        Axis.vertical   => renderBox.size.height,
+      };
     }
 
     group('animated: $animated, scrollDirection: $axis', () {
-      testWidgetsWithLeakTracking(
+      testWidgets(
         'RenderViewportBase.showOnScreen',
         (WidgetTester tester) async {
           await tester.pumpWidget(
@@ -1314,7 +1312,47 @@ void main() {
         },
       );
 
-      testWidgetsWithLeakTracking(
+      testWidgets('RenderViewportBase.showOnScreen twice almost instantly', (WidgetTester tester) async{
+        // Regression test for https://github.com/flutter/flutter/issues/137901
+        await tester.pumpWidget(
+          buildList(
+            floatingHeader: SliverPersistentHeader(
+              pinned: true,
+              floating: true,
+              delegate: _TestSliverPersistentHeaderDelegate(minExtent: 100, maxExtent: 300, key: headerKey, vsync: vsync),
+            ),
+          ),
+        );
+
+        final Finder pinnedHeaderContent = find.byKey(headerKey, skipOffstage: false);
+
+        controller.jumpTo(300.0 * 15);
+        await tester.pumpAndSettle();
+        expect(mainAxisExtent(tester, pinnedHeaderContent), lessThan(300));
+
+
+        tester.renderObject(pinnedHeaderContent).showOnScreen(
+          descendant: tester.renderObject(pinnedHeaderContent),
+          // Adding different rect to check if the second showOnScreen call
+          // leads to a different result.
+          // When the animation has forward status and the second showOnScreen
+          // is called, the new animation won't start.
+          rect: Offset.zero & const Size(150, 150),
+          duration: const Duration(seconds: 3),
+        );
+        await tester.pump(const Duration(seconds: 1));
+
+        tester.renderObject(pinnedHeaderContent).showOnScreen(
+          descendant: tester.renderObject(pinnedHeaderContent),
+          rect: Offset.zero & const Size(300, 300),
+        );
+
+        await tester.pumpAndSettle();
+        expect(controller.offset, 300.0 * 15);
+        expect(mainAxisExtent(tester, pinnedHeaderContent), 150);
+      });
+
+      testWidgets(
         'RenderViewportBase.showOnScreen but no child',
         (WidgetTester tester) async {
           await tester.pumpWidget(
@@ -1358,7 +1396,7 @@ void main() {
         },
       );
 
-      testWidgetsWithLeakTracking(
+      testWidgets(
         'RenderViewportBase.showOnScreen with maxShowOnScreenExtent ',
         (WidgetTester tester) async {
           await tester.pumpWidget(
@@ -1419,7 +1457,7 @@ void main() {
         },
       );
 
-      testWidgetsWithLeakTracking(
+      testWidgets(
         'RenderViewportBase.showOnScreen with minShowOnScreenExtent ',
         (WidgetTester tester) async {
           await tester.pumpWidget(
@@ -1480,7 +1518,7 @@ void main() {
         },
       );
 
-      testWidgetsWithLeakTracking(
+      testWidgets(
         'RenderViewportBase.showOnScreen should not scroll if the rect is already visible, '
         'even if it does not scroll linearly (reversed order version)',
         (WidgetTester tester) async {
@@ -1563,7 +1601,7 @@ void main() {
       );
     }
 
-    testWidgetsWithLeakTracking('up, forward growth', (WidgetTester tester) async {
+    testWidgets('up, forward growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.vertical, reverse: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1572,7 +1610,7 @@ void main() {
       expect(revealOffset, (300.0 + padding.horizontal)  * 5 + 34.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('up, reverse growth', (WidgetTester tester) async {
+    testWidgets('up, reverse growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.vertical, reverse: true, reverseGrowth: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1581,7 +1619,7 @@ void main() {
       expect(revealOffset, -(300.0 + padding.horizontal)  * 5 + 34.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('right, forward growth', (WidgetTester tester) async {
+    testWidgets('right, forward growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.horizontal));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1590,7 +1628,7 @@ void main() {
       expect(revealOffset, (300.0 + padding.horizontal)  * 5 + 22.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('right, reverse growth', (WidgetTester tester) async {
+    testWidgets('right, reverse growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.horizontal, reverseGrowth: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1599,7 +1637,7 @@ void main() {
       expect(revealOffset, -(300.0 + padding.horizontal)  * 5 + 22.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('down, forward growth', (WidgetTester tester) async {
+    testWidgets('down, forward growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.vertical));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1608,7 +1646,7 @@ void main() {
       expect(revealOffset, (300.0 + padding.horizontal)  * 5 + 22.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('down, reverse growth', (WidgetTester tester) async {
+    testWidgets('down, reverse growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.vertical, reverseGrowth: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1617,7 +1655,7 @@ void main() {
       expect(revealOffset, -(300.0 + padding.horizontal)  * 5 + 22.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('left, forward growth', (WidgetTester tester) async {
+    testWidgets('left, forward growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.horizontal, reverse: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1626,7 +1664,7 @@ void main() {
       expect(revealOffset, (300.0 + padding.horizontal)  * 5 + 34.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('left, reverse growth', (WidgetTester tester) async {
+    testWidgets('left, reverse growth', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.horizontal, reverse: true, reverseGrowth: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1635,7 +1673,7 @@ void main() {
       expect(revealOffset, -(300.0 + padding.horizontal)  * 5 + 34.0 * 2);
     });
 
-    testWidgetsWithLeakTracking('will not assert on mismatched axis', (WidgetTester tester) async {
+    testWidgets('will not assert on mismatched axis', (WidgetTester tester) async {
       await tester.pumpWidget(buildList(axis: Axis.vertical, reverse: true, reverseGrowth: true));
       final RenderAbstractViewport viewport = tester.allRenderObjects.whereType<RenderAbstractViewport>().first;
 
@@ -1644,7 +1682,7 @@ void main() {
     });
   });
 
-  testWidgetsWithLeakTracking('RenderViewportBase.showOnScreen reports the correct targetRect', (WidgetTester tester) async {
+  testWidgets('RenderViewportBase.showOnScreen reports the correct targetRect', (WidgetTester tester) async {
     final ScrollController innerController = ScrollController();
     final ScrollController outerController = ScrollController();
     addTearDown(innerController.dispose);
@@ -1731,7 +1769,7 @@ void main() {
       expect((errors.first.exception as FlutterError).toStringDeep(), message);
     }
 
-    testWidgetsWithLeakTracking('Horizontal viewport was given unbounded height', (WidgetTester tester) async {
+    testWidgets('Horizontal viewport was given unbounded height', (WidgetTester tester) async {
       await expectFlutterError(
         widget: buildNestedWidget(),
         tester: tester,
@@ -1745,7 +1783,7 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('Horizontal viewport was given unbounded width', (WidgetTester tester) async {
+    testWidgets('Horizontal viewport was given unbounded width', (WidgetTester tester) async {
       await expectFlutterError(
         widget: buildNestedWidget(Axis.horizontal),
         tester: tester,
@@ -1765,7 +1803,7 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('Vertical viewport was given unbounded width', (WidgetTester tester) async {
+    testWidgets('Vertical viewport was given unbounded width', (WidgetTester tester) async {
       await expectFlutterError(
         widget: buildNestedWidget(Axis.horizontal, Axis.vertical),
         tester: tester,
@@ -1779,7 +1817,7 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('Vertical viewport was given unbounded height', (WidgetTester tester) async {
+    testWidgets('Vertical viewport was given unbounded height', (WidgetTester tester) async {
       await expectFlutterError(
         widget: buildNestedWidget(Axis.vertical, Axis.vertical),
         tester: tester,
@@ -1959,7 +1997,7 @@ void main() {
       );
     }
 
-    testWidgetsWithLeakTracking('constrained viewport correctly clips overflow', (WidgetTester tester) async {
+    testWidgets('constrained viewport correctly clips overflow', (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/89717
       final  ScrollController controller = ScrollController();
       addTearDown(controller.dispose);
@@ -1988,7 +2026,7 @@ void main() {
       expect(tester.getTopLeft(find.text('Item 9')).dy, 226.0);
     });
 
-    testWidgetsWithLeakTracking('correctly clips overflow without constraints', (WidgetTester tester) async {
+    testWidgets('correctly clips overflow without constraints', (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/89717
       final  ScrollController controller = ScrollController();
       addTearDown(controller.dispose);
@@ -2017,7 +2055,10 @@ void main() {
       expect(tester.getTopLeft(find.text('Item 9')).dy, 226.0);
     });
 
-    testWidgetsWithLeakTracking('allows overscrolling on default platforms - vertical', (WidgetTester tester) async {
+    testWidgets('allows overscrolling on default platforms - vertical',
+    // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
+    experimentalLeakTesting: LeakTesting.settings.withTracked(classes: const <String>['CurvedAnimation']),
+    (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/10949
       // Scrollables should overscroll by default on iOS and macOS
       final  ScrollController controller = ScrollController();
@@ -2058,7 +2099,7 @@ void main() {
       expect(tester.getBottomLeft(find.text('Item 19')).dy, 600.0);
     }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS, TargetPlatform.macOS }));
 
-    testWidgetsWithLeakTracking('allows overscrolling on default platforms - horizontal', (WidgetTester tester) async {
+    testWidgets('allows overscrolling on default platforms - horizontal', (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/10949
       // Scrollables should overscroll by default on iOS and macOS
       final  ScrollController controller = ScrollController();
@@ -2099,7 +2140,7 @@ void main() {
       expect(tester.getTopRight(find.text('Item 19')).dx, 800.0);
     }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS, TargetPlatform.macOS }));
 
-    testWidgetsWithLeakTracking('allows overscrolling per physics - vertical', (WidgetTester tester) async {
+    testWidgets('allows overscrolling per physics - vertical', (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/10949
       // Scrollables should overscroll when the scroll physics allow
       final  ScrollController controller = ScrollController();
@@ -2140,7 +2181,7 @@ void main() {
       expect(tester.getBottomLeft(find.text('Item 19')).dy, 600.0);
     });
 
-    testWidgetsWithLeakTracking('allows overscrolling per physics - horizontal', (WidgetTester tester) async {
+    testWidgets('allows overscrolling per physics - horizontal', (WidgetTester tester) async {
       // Regression test for https://github.com/flutter/flutter/issues/10949
       // Scrollables should overscroll when the scroll physics allow
       final  ScrollController controller = ScrollController();
@@ -2186,7 +2227,7 @@ void main() {
     });
   });
 
-  testWidgetsWithLeakTracking('Handles infinite constraints when TargetPlatform is iOS or macOS', (WidgetTester tester) async {
+  testWidgets('Handles infinite constraints when TargetPlatform is iOS or macOS', (WidgetTester tester) async {
     // regression test for https://github.com/flutter/flutter/issues/45866
     await tester.pumpWidget(
       Directionality(
@@ -2222,7 +2263,7 @@ void main() {
     await tester.pumpAndSettle();
   }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS, TargetPlatform.macOS }));
 
-  testWidgetsWithLeakTracking('Viewport describeApproximateClip respects clipBehavior', (WidgetTester tester) async {
+  testWidgets('Viewport describeApproximateClip respects clipBehavior', (WidgetTester tester) async {
     await tester.pumpWidget(const Directionality(
       textDirection: TextDirection.ltr,
       child: CustomScrollView(
@@ -2259,7 +2300,7 @@ void main() {
     expect(visited, true);
   });
 
-  testWidgetsWithLeakTracking(
+  testWidgets(
       'Shrinkwrapping viewport asserts bounded cross axis', (WidgetTester tester) async {
     final List<FlutterErrorDetails> errors = <FlutterErrorDetails>[];
     FlutterError.onError = (FlutterErrorDetails error) => errors.add(error);
@@ -2331,4 +2372,85 @@ void main() {
     );
     errors.clear();
   });
+
+  testWidgets('RenderViewport maxLayoutCycles depends on the number of children',
+      (WidgetTester tester) async {
+    Future<void> expectFlutterError({
+      required Widget widget,
+      required WidgetTester tester,
+    }) async {
+      final List<FlutterErrorDetails> errors = <FlutterErrorDetails>[];
+      final FlutterExceptionHandler? oldHandler = FlutterError.onError;
+      FlutterError.onError = (FlutterErrorDetails error) => errors.add(error);
+      try {
+        await tester.pumpWidget(widget);
+      } finally {
+        FlutterError.onError = oldHandler;
+      }
+      expect(errors, isNotEmpty);
+      expect(errors.first.exception, isFlutterError);
+    }
+
+    Widget buildWidget({required int sliverCount, required int correctionsCount}) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: CustomScrollView(
+          slivers: List<Widget>.generate(
+              sliverCount,
+              (_) => _ScrollOffsetCorrectionSliver(correctionsCount: correctionsCount)),
+        ),
+      );
+    }
+
+    // 5 correction per child will pass.
+    await tester.pumpWidget(buildWidget(sliverCount: 30, correctionsCount: 5));
+
+    // 15 correction per child will throw exception.
+    await expectFlutterError(
+      widget: buildWidget(sliverCount: 1, correctionsCount: 15),
+      tester: tester,
+    );
+  });
+}
+
+// Simple sliver that applies N scroll offset corrections.
+class _RenderScrollOffsetCorrectionSliver extends RenderSliver {
+  int _correctionCount = 0;
+  @override
+  void performLayout() {
+    if (_correctionCount > 0) {
+      --_correctionCount;
+      geometry = const SliverGeometry(scrollOffsetCorrection: 1.0);
+      return;
+    }
+    const double extent = 5;
+    final double paintedChildSize = calculatePaintOffset(constraints, from: 0.0, to: extent);
+    final double cacheExtent = calculateCacheOffset(constraints, from: 0.0, to: extent);
+
+    geometry = SliverGeometry(
+      scrollExtent: extent,
+      paintExtent: paintedChildSize,
+      maxPaintExtent: extent,
+      cacheExtent: cacheExtent
+    );
+  }
+}
+
+class _ScrollOffsetCorrectionSliver extends SingleChildRenderObjectWidget {
+  const _ScrollOffsetCorrectionSliver({required this.correctionsCount});
+  final int correctionsCount;
+
+  @override
+  _RenderScrollOffsetCorrectionSliver createRenderObject(BuildContext context) {
+    final _RenderScrollOffsetCorrectionSliver sliver = _RenderScrollOffsetCorrectionSliver();
+    sliver._correctionCount = correctionsCount;
+    return sliver;
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, covariant _RenderScrollOffsetCorrectionSliver renderObject) {
+    super.updateRenderObject(context, renderObject);
+    renderObject.markNeedsLayout();
+    renderObject._correctionCount = correctionsCount;
+  }
 }

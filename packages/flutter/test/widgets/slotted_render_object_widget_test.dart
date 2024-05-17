@@ -13,7 +13,7 @@ const Color green = Color(0xFF00FF00);
 const Color yellow = Color(0xFFFFFF00);
 
 void main() {
-  testWidgetsWithLeakTracking('SlottedRenderObjectWidget test', (WidgetTester tester) async {
+  testWidgets('SlottedRenderObjectWidget test', (WidgetTester tester) async {
     await tester.pumpWidget(buildWidget(
       topLeft: Container(
         height: 100,
@@ -138,7 +138,7 @@ void main() {
     expect(_RenderTest().publicNameForSlot(slot), slot.toString());
   });
 
-  testWidgetsWithLeakTracking('key reparenting', (WidgetTester tester) async {
+  testWidgets('key reparenting', (WidgetTester tester) async {
     const Widget widget1 = SizedBox(key: ValueKey<String>('smol'), height: 10, width: 10);
     const Widget widget2 = SizedBox(key: ValueKey<String>('big'), height: 100, width: 100);
     const Widget nullWidget = SizedBox(key: ValueKey<String>('null'), height: 50, width: 50);
@@ -187,7 +187,9 @@ void main() {
     expect(widget2Element, same(tester.element(find.byWidget(widget2))));
   });
 
-  testWidgets('duplicated key error message', (WidgetTester tester) async {
+  testWidgets('duplicated key error message',
+  experimentalLeakTesting: LeakTesting.settings.withIgnoredAll(), // leaking by design because of exception
+  (WidgetTester tester) async {
     const Widget widget1 = SizedBox(key: ValueKey<String>('widget 1'), height: 10, width: 10);
     const Widget widget2 = SizedBox(key: ValueKey<String>('widget 1'), height: 100, width: 100);
     const Widget widget3 = SizedBox(key: ValueKey<String>('widget 1'), height: 50, width: 50);
@@ -204,7 +206,7 @@ void main() {
     ));
   });
 
-  testWidgetsWithLeakTracking('debugDescribeChildren', (WidgetTester tester) async {
+  testWidgets('debugDescribeChildren', (WidgetTester tester) async {
     await tester.pumpWidget(buildWidget(
       topLeft: const SizedBox(
         height: 100,
@@ -287,14 +289,11 @@ class _Diagonal extends RenderObjectWidget with SlottedMultiChildRenderObjectWid
 
   @override
   Widget? childForSlot(_DiagonalSlot? slot) {
-    switch (slot) {
-      case null:
-        return nullSlot;
-      case _DiagonalSlot.topLeft:
-        return topLeft;
-      case _DiagonalSlot.bottomRight:
-        return bottomRight;
-    }
+    return switch (slot) {
+      null => nullSlot,
+      _DiagonalSlot.topLeft     => topLeft,
+      _DiagonalSlot.bottomRight => bottomRight,
+    };
   }
 
   @override

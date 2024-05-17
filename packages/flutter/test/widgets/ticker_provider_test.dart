@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 void main() {
-  testWidgetsWithLeakTracking('TickerMode', (WidgetTester tester) async {
+  testWidgets('TickerMode', (WidgetTester tester) async {
     const Widget widget = TickerMode(
       enabled: false,
       child: CircularProgressIndicator(),
@@ -35,7 +35,7 @@ void main() {
     expect(tester.binding.transientCallbackCount, 0);
   });
 
-  testWidgetsWithLeakTracking('Navigation with TickerMode', (WidgetTester tester) async {
+  testWidgets('Navigation with TickerMode', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
       home: const LinearProgressIndicator(),
       routes: <String, WidgetBuilder>{
@@ -57,7 +57,7 @@ void main() {
     expect(tester.binding.transientCallbackCount, 1);
   });
 
-  testWidgetsWithLeakTracking('SingleTickerProviderStateMixin can handle not being used', (WidgetTester tester) async {
+  testWidgets('SingleTickerProviderStateMixin can handle not being used', (WidgetTester tester) async {
     const Widget widget = BoringTickerTest();
     expect(widget.toString, isNot(throwsException));
 
@@ -67,7 +67,9 @@ void main() {
   });
 
   group('TickerProviderStateMixin assertion control test', () {
-    testWidgets('SingleTickerProviderStateMixin create multiple tickers', (WidgetTester tester) async {
+    testWidgets('SingleTickerProviderStateMixin create multiple tickers',
+    experimentalLeakTesting: LeakTesting.settings.withIgnoredAll(), // leaking by design because of exception
+    (WidgetTester tester) async {
       const Widget widget = _SingleTickerCreateMultipleTicker();
       await tester.pumpWidget(widget);
       final dynamic exception = tester.takeException();

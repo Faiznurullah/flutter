@@ -18,6 +18,7 @@ import '../build_info.dart';
 import '../convert.dart';
 import '../device.dart';
 import '../device_port_forwarder.dart';
+import '../device_vm_service_discovery_for_attach.dart';
 import '../project.dart';
 import '../protocol_discovery.dart';
 import 'android.dart';
@@ -234,6 +235,7 @@ class AndroidDevice extends Device {
       case TargetPlatform.tester:
       case TargetPlatform.web_javascript:
       case TargetPlatform.windows_x64:
+      case TargetPlatform.windows_arm64:
         throw UnsupportedError('Invalid target platform for Android');
     }
   }
@@ -371,6 +373,9 @@ class AndroidDevice extends Device {
 
   @override
   String get name => modelID;
+
+  @override
+  bool get supportsFlavors => true;
 
   @override
   Future<bool> isAppInstalled(
@@ -567,6 +572,7 @@ class AndroidDevice extends Device {
       case TargetPlatform.linux_x64:
       case TargetPlatform.tester:
       case TargetPlatform.web_javascript:
+      case TargetPlatform.windows_arm64:
       case TargetPlatform.windows_x64:
         _logger.printError('Android platforms are only supported.');
         return LaunchResult.failed();
@@ -582,7 +588,6 @@ class AndroidDevice extends Device {
             debuggingOptions.buildInfo,
             targetArchs: <AndroidArch>[androidArch],
             fastStart: debuggingOptions.fastStart,
-            multidexEnabled: (platformArgs['multidex'] as bool?) ?? false,
           ),
       );
       // Package has been built, so we can get the updated application ID and
@@ -608,7 +613,7 @@ class AndroidDevice extends Device {
     if (debuggingOptions.debuggingEnabled) {
       vmServiceDiscovery = ProtocolDiscovery.vmService(
         // Avoid using getLogReader, which returns a singleton instance, because the
-        // VM Service discovery will dipose at the end. creating a new logger here allows
+        // VM Service discovery will dispose at the end. creating a new logger here allows
         // logs to be surfaced normally during `flutter drive`.
         await AdbLogReader.createLogReader(
           this,
@@ -665,8 +670,6 @@ class AndroidDevice extends Device {
         ...<String>['--ez', 'enable-impeller', 'false'],
       if (debuggingOptions.enableVulkanValidation)
         ...<String>['--ez', 'enable-vulkan-validation', 'true'],
-      if (debuggingOptions.impellerForceGL)
-        ...<String>['--ez', 'impeller-force-gl', 'true'],
       if (debuggingOptions.debuggingEnabled) ...<String>[
         if (debuggingOptions.buildInfo.isDebug) ...<String>[
           ...<String>['--ez', 'enable-checked-mode', 'true'],
@@ -799,6 +802,26 @@ class AndroidDevice extends Device {
   }
 
   @override
+  VMServiceDiscoveryForAttach getVMServiceDiscoveryForAttach({
+    String? appId,
+    String? fuchsiaModule,
+    int? filterDevicePort,
+    int? expectedHostPort,
+    required bool ipv6,
+    required Logger logger,
+  }) =>
+      LogScanningVMServiceDiscoveryForAttach(
+        // If it's an Android device, attaching relies on past log searching
+        // to find the service protocol.
+        Future<DeviceLogReader>.value(getLogReader(includePastLogs: true)),
+        portForwarder: portForwarder,
+        ipv6: ipv6,
+        devicePort: filterDevicePort,
+        hostPort: expectedHostPort,
+        logger: logger,
+      );
+
+  @override
   late final DevicePortForwarder? portForwarder = () {
     final String? adbPath = _androidSdk.adbPath;
     if (adbPath == null) {
@@ -875,7 +898,7 @@ Map<String, String> parseAdbDeviceProperties(String str) {
 ///
 /// Example output:
 ///
-/// ```
+/// ```none
 /// Applications Memory Usage (in Kilobytes):
 /// Uptime: 441088659 Realtime: 521464097
 ///

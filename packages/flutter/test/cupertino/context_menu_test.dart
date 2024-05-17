@@ -99,10 +99,12 @@ void main() {
     );
   }
 
-  Finder findStaticChildDecoration(WidgetTester tester) {
+  Finder findStaticChildColor(WidgetTester tester) {
     return find.descendant(
       of: findStatic(),
-      matching: find.byType(DecoratedBox),
+      matching: find.byWidgetPredicate(
+        (Widget widget) => widget is ColoredBox && widget.color != CupertinoColors.activeOrange,
+      ),
     );
   }
 
@@ -121,7 +123,7 @@ void main() {
   }
 
   group('CupertinoContextMenu before and during opening', () {
-    testWidgetsWithLeakTracking('An unopened CupertinoContextMenu renders child in the same place as without', (WidgetTester tester) async {
+    testWidgets('An unopened CupertinoContextMenu renders child in the same place as without', (WidgetTester tester) async {
       // Measure the child in the scene with no CupertinoContextMenu.
       final Widget child = getChild();
       await tester.pumpWidget(
@@ -141,7 +143,10 @@ void main() {
       expect(tester.getRect(find.byWidget(child)), childRect);
     });
 
-    testWidgetsWithLeakTracking('Can open CupertinoContextMenu by tap and hold', (WidgetTester tester) async {
+    testWidgets('Can open CupertinoContextMenu by tap and hold',
+      // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
+      experimentalLeakTesting: LeakTesting.settings.withTracked(classes: const <String>['CurvedAnimation']),
+      (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
       expect(find.byWidget(child), findsOneWidget);
@@ -177,7 +182,7 @@ void main() {
       expect(findStatic(), findsOneWidget);
     });
 
-    testWidgetsWithLeakTracking('CupertinoContextMenu is in the correct position when within a nested navigator', (WidgetTester tester) async {
+    testWidgets('CupertinoContextMenu is in the correct position when within a nested navigator', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(CupertinoApp(
         home: CupertinoPageScaffold(
@@ -242,7 +247,62 @@ void main() {
       expect(findStatic(), findsOneWidget);
     });
 
-    testWidgetsWithLeakTracking('CupertinoContextMenu with a basic builder opens and closes the same as when providing a child', (WidgetTester tester) async {
+    testWidgets('_DecoyChild preserves the child color', (WidgetTester tester) async {
+      final Widget child = getChild();
+      await tester.pumpWidget(CupertinoApp(
+        home: CupertinoPageScaffold(
+          backgroundColor: CupertinoColors.black,
+            child: MediaQuery(
+              data: const MediaQueryData(size: Size(800, 600)),
+                child: Center(
+                  child: CupertinoContextMenu(
+                  actions: const <CupertinoContextMenuAction>[
+                    CupertinoContextMenuAction(
+                      child: Text('CupertinoContextMenuAction'),
+                    ),
+                  ],
+                child: child
+              ),
+            )
+          )
+        ),
+      ));
+
+      // Expect no _DecoyChild to be present before the gesture.
+      final Finder decoyChild = find
+          .byWidgetPredicate((Widget w) => '${w.runtimeType}' == '_DecoyChild');
+      expect(decoyChild, findsNothing);
+
+      // Start press gesture on the child.
+      final Rect childRect = tester.getRect(find.byWidget(child));
+      final TestGesture gesture = await tester.startGesture(childRect.center);
+      await tester.pump();
+
+      // Find the _DecoyChild by runtimeType,
+      // find the Container descendant with the BoxDecoration,
+      // then read the boxDecoration property.
+      final Finder decoyChildDescendant = find.descendant(
+          of: decoyChild,
+          matching: find.byType(Container));
+      final BoxDecoration? boxDecoration = (tester.firstWidget(decoyChildDescendant) as Container).decoration as BoxDecoration?;
+      const List<Color?> expectedColors = <Color?>[null, Color(0x00000000)];
+
+      // `Color(0x00000000)` -> Is `Colors.transparent`.
+      // `null`              -> Default when no color argument is given in `BoxDecoration`.
+      // Any other color won't preserve the child's property.
+      expect(expectedColors, contains(boxDecoration?.color));
+
+      // End the gesture.
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Expect no _DecoyChild to be present after ending the gesture.
+      final Finder decoyChildAfterEnding = find
+          .byWidgetPredicate((Widget w) => '${w.runtimeType}' == '_DecoyChild');
+      expect(decoyChildAfterEnding, findsNothing);
+    });
+
+    testWidgets('CupertinoContextMenu with a basic builder opens and closes the same as when providing a child', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getBuilderContextMenu(builder: (BuildContext context, Animation<double> animation) {
         return child;
@@ -280,7 +340,7 @@ void main() {
       expect(findStatic(), findsOneWidget);
     });
 
-    testWidgetsWithLeakTracking('CupertinoContextMenu with a builder can change the animation', (WidgetTester tester) async {
+    testWidgets('CupertinoContextMenu with a builder can change the animation', (WidgetTester tester) async {
       await tester.pumpWidget(getBuilderContextMenu(builder: (BuildContext context, Animation<double> animation) {
         return Container(
           width: 300.0,
@@ -325,7 +385,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgetsWithLeakTracking('Hovering over Cupertino context menu updates cursor to clickable on Web', (WidgetTester tester) async {
+    testWidgets('Hovering over Cupertino context menu updates cursor to clickable on Web', (WidgetTester tester) async {
       final Widget child  = getChild();
       await tester.pumpWidget(CupertinoApp(
         home: CupertinoPageScaffold(
@@ -356,7 +416,7 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('CupertinoContextMenu is in the correct position when within a Transform.scale', (WidgetTester tester) async {
+    testWidgets('CupertinoContextMenu is in the correct position when within a Transform.scale', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(CupertinoApp(
         home: CupertinoPageScaffold(
@@ -414,7 +474,7 @@ void main() {
   });
 
   group('CupertinoContextMenu when open', () {
-    testWidgetsWithLeakTracking('Last action does not have border', (WidgetTester tester) async {
+    testWidgets('Last action does not have border', (WidgetTester tester) async {
       final Widget child  = getChild();
       await tester.pumpWidget(CupertinoApp(
         home: CupertinoPageScaffold(
@@ -438,7 +498,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(findStatic(), findsOneWidget);
 
-      expect(findStaticChildDecoration(tester), findsNWidgets(1));
+      expect(findStaticChildColor(tester), findsNWidgets(1));
 
       // Close the CupertinoContextMenu.
       await tester.tapAt(const Offset(1.0, 1.0));
@@ -470,10 +530,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(findStatic(), findsOneWidget);
 
-      expect(findStaticChildDecoration(tester), findsNWidgets(3));
+      expect(findStaticChildColor(tester), findsNWidgets(2));
     });
 
-    testWidgetsWithLeakTracking('Can close CupertinoContextMenu by background tap', (WidgetTester tester) async {
+    testWidgets('Can close CupertinoContextMenu by background tap', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
 
@@ -491,7 +551,7 @@ void main() {
       expect(findStatic(), findsNothing);
     });
 
-    testWidgetsWithLeakTracking('Can close CupertinoContextMenu by dragging down', (WidgetTester tester) async {
+    testWidgets('Can close CupertinoContextMenu by dragging down', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
 
@@ -533,7 +593,10 @@ void main() {
       expect(findStatic(), findsNothing);
     });
 
-    testWidgetsWithLeakTracking('Can close CupertinoContextMenu by flinging down', (WidgetTester tester) async {
+    testWidgets('Can close CupertinoContextMenu by flinging down',
+      // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
+      experimentalLeakTesting: LeakTesting.settings.withTracked(classes: const <String>['CurvedAnimation']),
+      (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
 
@@ -558,7 +621,7 @@ void main() {
       expect(findStatic(), findsNothing);
     });
 
-    testWidgetsWithLeakTracking("Backdrop is added using ModalRoute's filter parameter", (WidgetTester tester) async {
+    testWidgets("Backdrop is added using ModalRoute's filter parameter", (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
       expect(find.byType(BackdropFilter), findsNothing);
@@ -573,7 +636,7 @@ void main() {
       expect(find.byType(BackdropFilter), findsOneWidget);
     });
 
-    testWidgetsWithLeakTracking('Preview widget should have the correct border radius', (WidgetTester tester) async {
+    testWidgets('Preview widget should have the correct border radius', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
 
@@ -591,7 +654,7 @@ void main() {
       expect(previewWidget.borderRadius, equals(BorderRadius.circular(12.0)));
     });
 
-    testWidgetsWithLeakTracking('CupertinoContextMenu width is correct', (WidgetTester tester) async {
+    testWidgets('CupertinoContextMenu width is correct', (WidgetTester tester) async {
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(child: child));
       expect(find.byWidget(child), findsOneWidget);
@@ -634,7 +697,7 @@ void main() {
       }
     });
 
-    testWidgetsWithLeakTracking("ContextMenu route animation doesn't throw exception on dismiss", (WidgetTester tester) async {
+    testWidgets("ContextMenu route animation doesn't throw exception on dismiss", (WidgetTester tester) async {
       // This is a regression test for https://github.com/flutter/flutter/issues/124597.
       final List<int> items = List<int>.generate(2, (int index) => index).toList();
 
@@ -681,7 +744,7 @@ void main() {
   });
 
   group("Open layout differs depending on child's position on screen", () {
-    testWidgetsWithLeakTracking('Portrait', (WidgetTester tester) async {
+    testWidgets('Portrait', (WidgetTester tester) async {
       const Size portraitScreenSize = Size(600.0, 800.0);
       await binding.setSurfaceSize(portraitScreenSize);
 
@@ -753,7 +816,7 @@ void main() {
       await binding.setSurfaceSize(const Size(800.0, 600.0));
     });
 
-    testWidgetsWithLeakTracking('Landscape', (WidgetTester tester) async {
+    testWidgets('Landscape', (WidgetTester tester) async {
       // Pump a CupertinoContextMenu in the center of the screen and open it.
       final Widget child = getChild();
       await tester.pumpWidget(getContextMenu(
@@ -818,7 +881,7 @@ void main() {
     });
   });
 
-  testWidgetsWithLeakTracking('Conflicting gesture detectors', (WidgetTester tester) async {
+  testWidgets('Conflicting gesture detectors', (WidgetTester tester) async {
     int? onPointerDownTime;
     int? onPointerUpTime;
     bool insideTapTriggered = false;

@@ -259,7 +259,8 @@ void main() {
         r'   debug mode enabled - [a-zA-Z]+\n'
         r'   view size: Size\(2400\.0, 1800\.0\) \(in physical pixels\)\n'
         r'   device pixel ratio: 3\.0 \(physical pixels per logical pixel\)\n'
-        r'   configuration: Size\(800\.0, 600\.0\) at 3\.0x \(in logical pixels\)\n'
+        r'   configuration: BoxConstraints\(w=800\.0, h=600\.0\) at 3\.0x \(in\n'
+        r'     logical pixels\)\n'
         r'$',
       ),
     });
@@ -277,7 +278,7 @@ void main() {
         r'TransformLayer#[0-9a-f]{5}\n'
         r'   owner: RenderView#[0-9a-f]{5}\n'
         r'   creator: RenderView\n'
-        r'   engine layer: (TransformEngineLayer|PersistedTransform)#[0-9a-f]{5}\n'
+        r'   engine layer: (TransformLayer|TransformEngineLayer|PersistedTransform)#[0-9a-f]{5}\n'
         r'   handles: 1\n'
         r'   offset: Offset\(0\.0, 0\.0\)\n'
         r'   transform:\n'

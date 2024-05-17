@@ -14,11 +14,14 @@ import '../../image_data.dart';
 late List<int> selectedTabs;
 
 void main() {
+  // TODO(polina-c): dispose ImageStreamCompleterHandle, https://github.com/flutter/flutter/issues/145599 [leaks-to-clean]
+  LeakTesting.settings = LeakTesting.settings.withIgnoredAll();
+
   setUp(() {
     selectedTabs = <int>[];
   });
 
-  testWidgetsWithLeakTracking('Last tab gets focus', (WidgetTester tester) async {
+  testWidgets('Last tab gets focus', (WidgetTester tester) async {
     // 2 nodes for 2 tabs
     final List<FocusNode> focusNodes = <FocusNode>[];
     for (int i = 0; i < 2; i++) {
@@ -58,7 +61,7 @@ void main() {
     expect(focusNodes[1].hasFocus, isFalse);
   });
 
-  testWidgetsWithLeakTracking('Do not affect focus order in the route', (WidgetTester tester) async {
+  testWidgets('Do not affect focus order in the route', (WidgetTester tester) async {
     final List<FocusNode> focusNodes = <FocusNode>[];
     for (int i = 0; i < 4; i++) {
       final FocusNode focusNode = FocusNode();
@@ -127,7 +130,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Tab bar respects themes', (WidgetTester tester) async {
+  testWidgets('Tab bar respects themes', (WidgetTester tester) async {
     await tester.pumpWidget(
       CupertinoApp(
         home: CupertinoTabScaffold(
@@ -185,7 +188,7 @@ void main() {
     expect(tab2.text.style!.color!.value, CupertinoColors.systemRed.darkColor.value);
   });
 
-  testWidgetsWithLeakTracking('dark mode background color', (WidgetTester tester) async {
+  testWidgets('dark mode background color', (WidgetTester tester) async {
     const CupertinoDynamicColor backgroundColor = CupertinoDynamicColor.withBrightness(
       color: Color(0xFF123456),
       darkColor: Color(0xFF654321),
@@ -238,7 +241,7 @@ void main() {
     expect(tabDecoration.color!.value, backgroundColor.darkColor.value);
   });
 
-  testWidgetsWithLeakTracking('Does not lose state when focusing on text input', (WidgetTester tester) async {
+  testWidgets('Does not lose state when focusing on text input', (WidgetTester tester) async {
     // Regression testing for https://github.com/flutter/flutter/issues/28457.
 
     await tester.pumpWidget(
@@ -284,12 +287,13 @@ void main() {
     expect(find.text("don't lose me"), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('textScaleFactor is set to 1.0', (WidgetTester tester) async {
+  testWidgets('textScaleFactor is set to 1.0', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(builder: (BuildContext context) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaleFactor: 99),
+          return MediaQuery.withClampedTextScaling(
+            minScaleFactor: 99,
+            maxScaleFactor: 99,
             child: CupertinoTabScaffold(
               tabBar: CupertinoTabBar(
                 items: List<BottomNavigationBarItem>.generate(

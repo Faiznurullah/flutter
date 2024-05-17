@@ -252,14 +252,11 @@ class AndroidDeviceDiscovery implements DeviceDiscovery {
   }
 
   Future<bool> _matchesCPURequirement(AndroidDevice device) async {
-    switch (cpu) {
-      case null:
-        return true;
-      case AndroidCPU.arm64:
-        return device.isArm64();
-      case AndroidCPU.arm:
-        return device.isArm();
-    }
+    return switch (cpu) {
+      null => Future<bool>.value(true),
+      AndroidCPU.arm64 => device.isArm64(),
+      AndroidCPU.arm   => device.isArm(),
+    };
   }
 
   /// Picks a random Android device out of connected devices and sets it as
@@ -649,7 +646,7 @@ class AndroidDevice extends Device {
 
   /// Retrieves device's wakefulness state.
   ///
-  /// See: https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/os/PowerManagerInternal.java
+  /// See: https://android.googlesource.com/platform/frameworks/base/+/main/core/java/android/os/PowerManagerInternal.java
   Future<String> _getWakefulness() async {
     final String powerInfo = await shellEval('dumpsys', <String>['power']);
     // A motoG4 phone returns `mWakefulness=Awake`.
@@ -742,13 +739,8 @@ class AndroidDevice extends Device {
     }
     _loggingProcess = await startProcess(
       adbPath,
-      // Make logcat less chatty by filtering down to just ActivityManager
-      // (to let us know when app starts), flutter (needed by tests to see
-      // log output), and fatal messages (hopefully catches tombstones).
-      // For local testing, this can just be:
-      //   <String>['-s', deviceId, 'logcat']
-      // to view the whole log, or just run logcat alongside this.
-      <String>['-s', deviceId, 'logcat', 'ActivityManager:I', 'flutter:V', '*:F'],
+      // Catch the whole log.
+      <String>['-s', deviceId, 'logcat'],
     );
     _loggingProcess!.stdout
       .transform<String>(const Utf8Decoder(allowMalformed: true))

@@ -84,6 +84,7 @@ class SimpleBuilderTableView extends TwoDimensionalScrollView {
     this.applyDimensions = true,
     this.forgetToLayoutChild = false,
     this.setLayoutOffset = true,
+    super.hitTestBehavior,
   }) : super(delegate: delegate);
 
   // Piped through for testing in RenderTwoDimensionalViewport
@@ -195,7 +196,7 @@ class RenderSimpleBuilderTableViewport extends RenderTwoDimensionalViewport {
 
   @override
   TestExtendedParentData parentDataOf(RenderBox child) {
-    return child.parentData! as TestExtendedParentData;
+    return super.parentDataOf(child) as TestExtendedParentData;
   }
 
   @override

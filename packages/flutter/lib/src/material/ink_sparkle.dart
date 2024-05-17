@@ -201,6 +201,13 @@ class InkSparkle extends InteractiveInkFeature {
 
     // Creates an element of randomness so that ink emanating from the same
     // pixel have slightly different rings and sparkles.
+    assert((){
+      // In tests, randomness can cause flakes. So if a seed has not
+      // already been specified (i.e. for the purpose of the test), set it to
+      // the constant turbulence seed.
+      turbulenceSeed ??= _InkSparkleFactory.constantSeed;
+      return true;
+    }());
     _turbulenceSeed = turbulenceSeed ?? math.Random().nextDouble() * 1000.0;
   }
 
@@ -309,9 +316,9 @@ class InkSparkle extends InteractiveInkFeature {
 
   /// All double values for uniforms come from the Android 12 ripple
   /// implementation from the following files:
-  /// - https://cs.android.com/android/platform/superproject/+/master:frameworks/base/graphics/java/android/graphics/drawable/RippleShader.java
-  /// - https://cs.android.com/android/platform/superproject/+/master:frameworks/base/graphics/java/android/graphics/drawable/RippleDrawable.java
-  /// - https://cs.android.com/android/platform/superproject/+/master:frameworks/base/graphics/java/android/graphics/drawable/RippleAnimationSession.java
+  /// - https://cs.android.com/android/platform/superproject/+/main:frameworks/base/graphics/java/android/graphics/drawable/RippleShader.java
+  /// - https://cs.android.com/android/platform/superproject/+/main:frameworks/base/graphics/java/android/graphics/drawable/RippleDrawable.java
+  /// - https://cs.android.com/android/platform/superproject/+/main:frameworks/base/graphics/java/android/graphics/drawable/RippleAnimationSession.java
   void _updateFragmentShader() {
     const double turbulenceScale = 1.5;
     final double turbulencePhase = _turbulenceSeed + _radiusScale.value;
@@ -429,7 +436,9 @@ class InkSparkle extends InteractiveInkFeature {
 class _InkSparkleFactory extends InteractiveInkFeatureFactory {
   const _InkSparkleFactory() : turbulenceSeed = null;
 
-  const _InkSparkleFactory.constantTurbulenceSeed() : turbulenceSeed = 1337.0;
+  const _InkSparkleFactory.constantTurbulenceSeed() : turbulenceSeed = _InkSparkleFactory.constantSeed;
+
+  static const double constantSeed = 1337.0;
 
   static void initializeShader() {
     if (!_initCalled) {

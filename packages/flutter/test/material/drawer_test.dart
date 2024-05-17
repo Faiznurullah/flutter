@@ -5,12 +5,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 import '../widgets/semantics_tester.dart';
 
 void main() {
-  testWidgetsWithLeakTracking('Material2 - Drawer control test', (WidgetTester tester) async {
+  testWidgets('Material2 - Drawer control test', (WidgetTester tester) async {
     const Key containerKey = Key('container');
 
     await tester.pumpWidget(
@@ -58,7 +57,7 @@ void main() {
     expect(find.text('header'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Material3 - Drawer control test', (WidgetTester tester) async {
+  testWidgets('Material3 - Drawer control test', (WidgetTester tester) async {
     const Key containerKey = Key('container');
 
     await tester.pumpWidget(
@@ -106,7 +105,7 @@ void main() {
     expect(find.text('header'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Drawer dismiss barrier has label', (WidgetTester tester) async {
+  testWidgets('Drawer dismiss barrier has label', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
     await tester.pumpWidget(
       const MaterialApp(
@@ -130,7 +129,7 @@ void main() {
     semantics.dispose();
   }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS,  TargetPlatform.macOS }));
 
-  testWidgetsWithLeakTracking('Drawer dismiss barrier has no label', (WidgetTester tester) async {
+  testWidgets('Drawer dismiss barrier has no label', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
     await tester.pumpWidget(
       const MaterialApp(
@@ -154,22 +153,19 @@ void main() {
     semantics.dispose();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgetsWithLeakTracking('Scaffold drawerScrimColor', (WidgetTester tester) async {
-    // The scrim is a Container within a Semantics node labeled "Dismiss",
+  testWidgets('Scaffold drawerScrimColor', (WidgetTester tester) async {
+    // The scrim is a ColoredBox within a Semantics node labeled "Dismiss",
     // within a DrawerController. Sorry.
-    Container getScrim() {
-      return tester.widget<Container>(
+    Widget getScrim() {
+      return tester.widget<Semantics>(
         find.descendant(
-          of: find.descendant(
-            of: find.byType(DrawerController),
-            matching: find.byWidgetPredicate((Widget widget) {
-              return widget is Semantics
-                  && widget.properties.label == 'Dismiss';
-            }),
-          ),
-          matching: find.byType(Container),
+          of: find.byType(DrawerController),
+          matching: find.byWidgetPredicate((Widget widget) {
+            return widget is Semantics
+                && widget.properties.label == 'Dismiss';
+          }),
         ),
-      );
+      ).child!;
     }
 
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
@@ -197,7 +193,8 @@ void main() {
     scaffoldKey.currentState!.openDrawer();
     await tester.pumpAndSettle();
 
-    expect(getScrim().color, Colors.black54);
+    ColoredBox scrim = getScrim() as ColoredBox;
+    expect(scrim.color, Colors.black54);
 
     await tester.tap(find.byType(Drawer));
     await tester.pumpAndSettle();
@@ -209,14 +206,15 @@ void main() {
     scaffoldKey.currentState!.openDrawer();
     await tester.pumpAndSettle();
 
-    expect(getScrim().color, const Color(0xFF323232));
+    scrim = getScrim() as ColoredBox;
+    expect(scrim.color, const Color(0xFF323232));
 
     await tester.tap(find.byType(Drawer));
     await tester.pumpAndSettle();
     expect(find.byType(Drawer), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Open/close drawers by flinging', (WidgetTester tester) async {
+  testWidgets('Open/close drawers by flinging', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -261,7 +259,7 @@ void main() {
     expect(state.isEndDrawerOpen, equals(false));
   });
 
-  testWidgetsWithLeakTracking('Scaffold.drawer - null restorationId ', (WidgetTester tester) async {
+  testWidgets('Scaffold.drawer - null restorationId ', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -284,7 +282,7 @@ void main() {
     expect(find.text('drawer'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Scaffold.endDrawer - null restorationId ', (WidgetTester tester) async {
+  testWidgets('Scaffold.endDrawer - null restorationId ', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -307,7 +305,7 @@ void main() {
     expect(find.text('endDrawer'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Scaffold.drawer state restoration test', (WidgetTester tester) async {
+  testWidgets('Scaffold.drawer state restoration test', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -338,7 +336,7 @@ void main() {
     expect(find.text('drawer'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Scaffold.endDrawer state restoration test', (WidgetTester tester) async {
+  testWidgets('Scaffold.endDrawer state restoration test', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -369,7 +367,7 @@ void main() {
     expect(find.text('endDrawer'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Both drawer and endDrawer state restoration test', (WidgetTester tester) async {
+  testWidgets('Both drawer and endDrawer state restoration test', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -430,7 +428,7 @@ void main() {
     expect(find.text('endDrawer'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('ScaffoldState close drawer', (WidgetTester tester) async {
+  testWidgets('ScaffoldState close drawer', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -453,7 +451,7 @@ void main() {
     expect(find.text('Drawer'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('ScaffoldState close drawer do not crash if drawer is already closed', (WidgetTester tester) async {
+  testWidgets('ScaffoldState close drawer do not crash if drawer is already closed', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -472,7 +470,7 @@ void main() {
     expect(find.text('Drawer'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Disposing drawer does not crash if drawer is open and framework is locked', (WidgetTester tester) async {
+  testWidgets('Disposing drawer does not crash if drawer is open and framework is locked', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/34978
     addTearDown(tester.view.reset);
     tester.view.physicalSize = const Size(1800.0, 2400.0);
@@ -513,7 +511,7 @@ void main() {
     expect(find.byType(BackButton), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Disposing endDrawer does not crash if endDrawer is open and framework is locked', (WidgetTester tester) async {
+  testWidgets('Disposing endDrawer does not crash if endDrawer is open and framework is locked', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/34978
     addTearDown(tester.view.reset);
     tester.view.physicalSize = const Size(1800.0, 2400.0);
@@ -554,7 +552,7 @@ void main() {
     expect(find.byType(BackButton), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('ScaffoldState close end drawer', (WidgetTester tester) async {
+  testWidgets('ScaffoldState close end drawer', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -577,7 +575,7 @@ void main() {
     expect(find.text('endDrawer'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Drawer width defaults to Material spec', (WidgetTester tester) async {
+  testWidgets('Drawer width defaults to Material spec', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -596,7 +594,7 @@ void main() {
     expect(box.size.width, equals(304.0));
   });
 
-  testWidgetsWithLeakTracking('Drawer width can be customized by parameter', (WidgetTester tester) async {
+  testWidgets('Drawer width can be customized by parameter', (WidgetTester tester) async {
     const double smallWidth = 200;
 
     await tester.pumpWidget(
@@ -618,7 +616,7 @@ void main() {
     expect(box.size.width, equals(smallWidth));
   });
 
-  testWidgetsWithLeakTracking('Material3 - Drawer default shape (ltr)', (WidgetTester tester) async {
+  testWidgets('Material3 - Drawer default shape (ltr)', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(useMaterial3: true),
@@ -678,7 +676,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Material3 - Drawer default shape (rtl)', (WidgetTester tester) async {
+  testWidgets('Material3 - Drawer default shape (rtl)', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(useMaterial3: true),
@@ -738,7 +736,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('Material3 - Drawer clip behavior', (WidgetTester tester) async {
+  testWidgets('Material3 - Drawer clip behavior', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(useMaterial3: true),
@@ -794,7 +792,7 @@ void main() {
     // support is deprecated and the APIs are removed, these tests
     // can be deleted.
 
-    testWidgetsWithLeakTracking('Material2 - Drawer default shape', (WidgetTester tester) async {
+    testWidgets('Material2 - Drawer default shape', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(useMaterial3: false),
@@ -835,7 +833,7 @@ void main() {
       expect(material.shape, null);
     });
 
-    testWidgetsWithLeakTracking('Material2 - Drawer clip behavior', (WidgetTester tester) async {
+    testWidgets('Material2 - Drawer clip behavior', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(useMaterial3: false),

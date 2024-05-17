@@ -38,7 +38,6 @@ import 'java.dart';
 import 'migrations/android_studio_java_gradle_conflict_migration.dart';
 import 'migrations/min_sdk_version_migration.dart';
 import 'migrations/top_level_gradle_build_file_migration.dart';
-import 'multidex.dart';
 
 /// The regex to grab variant names from printBuildVariants gradle task
 ///
@@ -317,7 +316,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     ];
 
     final ProjectMigration migration = ProjectMigration(migrators);
-    migration.run();
+    await migration.run();
 
     final bool usesAndroidX = isAppUsingAndroidX(project.android.hostAppGradleRoot);
     if (usesAndroidX) {
@@ -371,6 +370,9 @@ class AndroidGradleBuilder implements AndroidBuilder {
     if (!buildInfo.androidGradleDaemon) {
       command.add('--no-daemon');
     }
+    if (buildInfo.androidSkipBuildDependencyValidation) {
+      command.add('-PskipDependencyChecks=true');
+    }
     final LocalEngineInfo? localEngineInfo = _artifacts.localEngineInfo;
     if (localEngineInfo != null) {
       final Directory localEngineRepo = _getLocalEngineRepo(
@@ -395,16 +397,6 @@ class AndroidGradleBuilder implements AndroidBuilder {
       command.add('-Ptarget-platform=$targetPlatforms');
     }
     command.add('-Ptarget=$target');
-    // Only attempt adding multidex support if all the flutter generated files exist.
-    // If the files do not exist and it was unintentional, the app will fail to build
-    // and prompt the developer if they wish Flutter to add the files again via gradle_error.dart.
-    if (androidBuildInfo.multidexEnabled &&
-        multiDexApplicationExists(project.directory) &&
-        androidManifestHasNameVariable(project.directory)) {
-      command.add('-Pmultidex-enabled=true');
-      ensureMultiDexApplicationExists(project.directory);
-      _logger.printStatus('Building with Flutter multidex support enabled.');
-    }
     // If using v1 embedding, we want to use FlutterApplication as the base app.
     final String baseApplicationName =
         project.android.getEmbeddingVersion() == AndroidEmbeddingVersion.v2 ?
@@ -490,7 +482,13 @@ class AndroidGradleBuilder implements AndroidBuilder {
       status.stop();
     }
 
-    _usage.sendTiming('build', 'gradle', sw.elapsed);
+    final Duration elapsedDuration = sw.elapsed;
+    _usage.sendTiming('build', 'gradle', elapsedDuration);
+    _analytics.send(Event.timing(
+      workflow: 'build',
+      variableName: 'gradle',
+      elapsedMilliseconds: elapsedDuration.inMilliseconds,
+    ));
 
     if (exitCode != 0) {
       if (detectedGradleError == null) {
@@ -506,7 +504,6 @@ class AndroidGradleBuilder implements AndroidBuilder {
         line: detectedGradleErrorLine!,
         project: project,
         usesAndroidX: usesAndroidX,
-        multidexEnabled: androidBuildInfo.multidexEnabled,
       );
 
       if (maxRetries == null || retry < maxRetries) {
@@ -552,14 +549,15 @@ class AndroidGradleBuilder implements AndroidBuilder {
       final File bundleFile = findBundleFile(project, buildInfo, _logger, _usage, _analytics);
       final String appSize = (buildInfo.mode == BuildMode.debug)
           ? '' // Don't display the size when building a debug variant.
-          : ' (${getSizeAsMB(bundleFile.lengthSync())})';
+          : ' (${getSizeAsPlatformMB(bundleFile.lengthSync())})';
 
       if (buildInfo.codeSizeDirectory != null) {
         await _performCodeSizeAnalysis('aab', bundleFile, androidBuildInfo);
       }
 
       _logger.printStatus(
-        '${_logger.terminal.successMark} Built ${_fileSystem.path.relative(bundleFile.path)}$appSize.',
+        '${_logger.terminal.successMark} '
+        'Built ${_fileSystem.path.relative(bundleFile.path)}$appSize',
         color: TerminalColor.green,
       );
       return;
@@ -589,9 +587,10 @@ class AndroidGradleBuilder implements AndroidBuilder {
 
       final String appSize = (buildInfo.mode == BuildMode.debug)
           ? '' // Don't display the size when building a debug variant.
-          : ' (${getSizeAsMB(apkFile.lengthSync())})';
+          : ' (${getSizeAsPlatformMB(apkFile.lengthSync())})';
       _logger.printStatus(
-        '${_logger.terminal.successMark}  Built ${_fileSystem.path.relative(apkFile.path)}$appSize.',
+        '${_logger.terminal.successMark} '
+        'Built ${_fileSystem.path.relative(apkFile.path)}$appSize',
         color: TerminalColor.green,
       );
 
@@ -608,6 +607,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
       fileSystem: _fileSystem,
       logger: _logger,
       flutterUsage: _usage,
+      analytics: _analytics,
     );
     final String archName = androidBuildInfo.targetArchs.single.archName;
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
@@ -656,10 +656,9 @@ class AndroidGradleBuilder implements AndroidBuilder {
     required Directory outputDirectory,
     required String buildNumber,
   }) async {
-
     final FlutterManifest manifest = project.manifest;
-    if (!manifest.isModule && !manifest.isPlugin) {
-      throwToolExit('AARs can only be built for plugin or module projects.');
+    if (!manifest.isModule) {
+      throwToolExit('AARs can only be built for module projects.');
     }
 
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
@@ -757,7 +756,13 @@ class AndroidGradleBuilder implements AndroidBuilder {
     } finally {
       status.stop();
     }
-    _usage.sendTiming('build', 'gradle-aar', sw.elapsed);
+    final Duration elapsedDuration = sw.elapsed;
+    _usage.sendTiming('build', 'gradle-aar', elapsedDuration);
+    _analytics.send(Event.timing(
+      workflow: 'build',
+      variableName: 'gradle-aar',
+      elapsedMilliseconds: elapsedDuration.inMilliseconds,
+    ));
 
     if (result.exitCode != 0) {
       _logger.printStatus(result.stdout, wrap: false);
@@ -777,7 +782,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
       );
     }
     _logger.printStatus(
-      '${_logger.terminal.successMark} Built ${_fileSystem.path.relative(repoDirectory.path)}.',
+      '${_logger.terminal.successMark} '
+      'Built ${_fileSystem.path.relative(repoDirectory.path)}',
       color: TerminalColor.green,
     );
   }
@@ -792,42 +798,59 @@ class AndroidGradleBuilder implements AndroidBuilder {
       project: project,
     );
 
-    _usage.sendTiming('print', 'android build variants', sw.elapsed);
+    final Duration elapsedDuration = sw.elapsed;
+    _usage.sendTiming('print', 'android build variants', elapsedDuration);
+    _analytics.send(Event.timing(
+      workflow: 'print',
+      variableName: 'android build variants',
+      elapsedMilliseconds: elapsedDuration.inMilliseconds,
+    ));
 
     if (result.exitCode != 0) {
       _logger.printStatus(result.stdout, wrap: false);
       _logger.printError(result.stderr, wrap: false);
       return const <String>[];
     }
-    final List<String> options = <String>[];
-    for (final String line in LineSplitter.split(result.stdout)) {
-      final RegExpMatch? match = _kBuildVariantRegex.firstMatch(line);
-      if (match != null) {
-        options.add(match.namedGroup(_kBuildVariantRegexGroupName)!);
-      }
-    }
-    return options;
+    return <String>[
+      for (final String line in LineSplitter.split(result.stdout))
+        if (_kBuildVariantRegex.firstMatch(line) case final RegExpMatch match)
+          match.namedGroup(_kBuildVariantRegexGroupName)!,
+    ];
   }
 
   @override
-  Future<void> outputsAppLinkSettings(
+  Future<String> outputsAppLinkSettings(
     String buildVariant, {
     required FlutterProject project,
   }) async {
     final String taskName = _getOutputAppLinkSettingsTaskFor(buildVariant);
+    final Directory directory = await project.buildDirectory
+        .childDirectory('deeplink_data').create(recursive: true);
+    final String outputPath = globals.fs.path.join(
+      directory.absolute.path,
+      'app-link-settings-$buildVariant.json',
+    );
     final Stopwatch sw = Stopwatch()
       ..start();
     final RunResult result = await _runGradleTask(
       taskName,
-      options: const <String>['-q'],
+      options: <String>['-q', '-PoutputPath=$outputPath'],
       project: project,
     );
-    _usage.sendTiming('outputs', 'app link settings', sw.elapsed);
+    final Duration elapsedDuration = sw.elapsed;
+    _usage.sendTiming('outputs', 'app link settings', elapsedDuration);
+    _analytics.send(Event.timing(
+      workflow: 'outputs',
+      variableName: 'app link settings',
+      elapsedMilliseconds: elapsedDuration.inMilliseconds,
+    ));
 
     if (result.exitCode != 0) {
       _logger.printStatus(result.stdout, wrap: false);
       _logger.printError(result.stderr, wrap: false);
+      throwToolExit(result.stderr);
     }
+    return outputPath;
   }
 }
 

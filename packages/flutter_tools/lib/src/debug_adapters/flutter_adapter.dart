@@ -385,14 +385,7 @@ class FlutterDebugAdapter extends FlutterBaseDebugAdapter with VmServiceInfoFile
         // debugger we send this ourselves, to allow clients to connect to the
         // VM Service for things like starting DevTools, even if debugging is
         // not available.
-        // TODO(dantup): Switch this to call `sendDebuggerUris()` on the base
-        //   adapter once rolled into Flutter.
-        sendEvent(
-          RawEventBody(<String, Object?>{
-            'vmServiceUri': vmServiceUri.toString(),
-          }),
-          eventType: 'dart.debuggerUris',
-        );
+        sendDebuggerUris(vmServiceUri);
       }
   }
 
@@ -418,6 +411,19 @@ class FlutterDebugAdapter extends FlutterBaseDebugAdapter with VmServiceInfoFile
       RawEventBody(params),
       eventType: 'flutter.appStart',
     );
+  }
+
+  /// Handles any app.progress event from Flutter.
+  void _handleAppProgress(Map<String, Object?> params) {
+    // If this is a new progress starting (and we're still launching), update
+    // the progress notification.
+    //
+    // We ignore finished status because we have a limited API - the next
+    // item will replace it (or the launch progress will be completed by
+    // _handleAppStarted).
+    if (params case {'message': final String message, 'finished': false}) {
+      launchProgress?.update(message: message);
+    }
   }
 
   /// Handles the app.started event from Flutter.
@@ -472,7 +478,7 @@ class FlutterDebugAdapter extends FlutterBaseDebugAdapter with VmServiceInfoFile
   }
 
   /// Handles incoming JSON events from `flutter run --machine`.
-  void _handleJsonEvent(String event, Map<String, Object?>? params) {
+  void handleJsonEvent(String event, Map<String, Object?>? params) {
     params ??= <String, Object?>{};
     switch (event) {
       case 'daemon.connected':
@@ -481,6 +487,8 @@ class FlutterDebugAdapter extends FlutterBaseDebugAdapter with VmServiceInfoFile
         _handleDebugPort(params);
       case 'app.start':
         _handleAppStart(params);
+      case 'app.progress':
+        _handleAppProgress(params);
       case 'app.started':
         _handleAppStarted();
     }
@@ -646,7 +654,7 @@ class FlutterDebugAdapter extends FlutterBaseDebugAdapter with VmServiceInfoFile
     final Object? params = payload['params'];
     final Object? id = payload['id'];
     if (event is String && params is Map<String, Object?>?) {
-      _handleJsonEvent(event, params);
+      handleJsonEvent(event, params);
     } else if (id != null && method is String && params is Map<String, Object?>?) {
       _handleJsonRequest(id, method, params);
     } else if (id is int && _flutterRequestCompleters.containsKey(id)) {

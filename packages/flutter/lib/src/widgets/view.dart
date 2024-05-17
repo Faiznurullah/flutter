@@ -475,9 +475,7 @@ class _MultiChildComponentWidget extends Widget {
 ///  * [WidgetsBinding] for an explanation of rendering and non-rendering zones.
 class ViewCollection extends _MultiChildComponentWidget {
   /// Creates a [ViewCollection] widget.
-  ///
-  /// The provided list of [views] must contain at least one widget.
-  const ViewCollection({super.key, required super.views}) : assert(views.length > 0);
+  const ViewCollection({super.key, required super.views});
 
   /// The [View] descendants of this widget.
   ///
@@ -701,17 +699,14 @@ class _MultiChildComponentElement extends Element {
 
   @override
   List<DiagnosticsNode> debugDescribeChildren() {
-    final List<DiagnosticsNode> children = <DiagnosticsNode>[];
-    if (_childElement != null) {
-      children.add(_childElement!.toDiagnosticsNode());
-    }
-    for (int i = 0; i < _viewElements.length; i++) {
-      children.add(_viewElements[i].toDiagnosticsNode(
-        name: 'view ${i + 1}',
-        style: DiagnosticsTreeStyle.offstage,
-      ));
-    }
-    return children;
+    return <DiagnosticsNode>[
+      if (_childElement != null) _childElement!.toDiagnosticsNode(),
+      for (int i = 0; i < _viewElements.length; i++)
+        _viewElements[i].toDiagnosticsNode(
+          name: 'view ${i + 1}',
+          style: DiagnosticsTreeStyle.offstage,
+        ),
+    ];
   }
 }
 

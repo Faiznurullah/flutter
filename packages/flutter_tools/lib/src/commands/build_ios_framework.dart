@@ -68,6 +68,11 @@ abstract class BuildFrameworkCommand extends BuildSubCommand {
       ..addFlag('cocoapods',
         help: 'Produce a Flutter.podspec instead of an engine Flutter.xcframework (recommended if host app uses CocoaPods).',
       )
+      ..addFlag('plugins',
+        defaultsTo: true,
+        help: 'Whether to produce frameworks for the plugins. '
+              'This is intended for cases where plugins are already being built separately.',
+      )
       ..addFlag('static',
         help: 'Build plugins as static frameworks. Link on, but do not embed these frameworks in the existing Xcode project.',
       )
@@ -107,19 +112,11 @@ abstract class BuildFrameworkCommand extends BuildSubCommand {
   late final FlutterProject project = FlutterProject.current();
 
   Future<List<BuildInfo>> getBuildInfos() async {
-    final List<BuildInfo> buildInfos = <BuildInfo>[];
-
-    if (boolArg('debug')) {
-      buildInfos.add(await getBuildInfo(forcedBuildMode: BuildMode.debug));
-    }
-    if (boolArg('profile')) {
-      buildInfos.add(await getBuildInfo(forcedBuildMode: BuildMode.profile));
-    }
-    if (boolArg('release')) {
-      buildInfos.add(await getBuildInfo(forcedBuildMode: BuildMode.release));
-    }
-
-    return buildInfos;
+    return <BuildInfo>[
+      if (boolArg('debug'))   await getBuildInfo(forcedBuildMode: BuildMode.debug),
+      if (boolArg('profile')) await getBuildInfo(forcedBuildMode: BuildMode.profile),
+      if (boolArg('release')) await getBuildInfo(forcedBuildMode: BuildMode.release),
+    ];
   }
 
   @override
@@ -134,6 +131,10 @@ abstract class BuildFrameworkCommand extends BuildSubCommand {
 
     if ((await getBuildInfos()).isEmpty) {
       throwToolExit('At least one of "--debug" or "--profile", or "--release" is required.');
+    }
+
+    if (!boolArg('plugins') && boolArg('static')) {
+      throwToolExit('--static cannot be used with the --no-plugins flag');
     }
   }
 
@@ -263,8 +264,13 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
           buildInfo, modeDirectory, iPhoneBuildOutput, simulatorBuildOutput);
 
       // Build and copy plugins.
-      await processPodsIfNeeded(project.ios, getIosBuildDirectory(), buildInfo.mode);
-      if (hasPlugins(project)) {
+      await processPodsIfNeeded(
+        project.ios,
+        getIosBuildDirectory(),
+        buildInfo.mode,
+        forceCocoaPodsOnly: true,
+      );
+      if (boolArg('plugins') && hasPlugins(project)) {
         await _producePlugins(buildInfo.mode, xcodeBuildConfiguration, iPhoneBuildOutput, simulatorBuildOutput, modeDirectory);
       }
 
@@ -374,7 +380,7 @@ LICENSE
   s.author                = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
   s.source                = { :http => '${cache.storageBaseUrl}/flutter_infra_release/flutter/${cache.engineRevision}/$artifactsMode/artifacts.zip' }
   s.documentation_url     = 'https://flutter.dev/docs'
-  s.platform              = :ios, '11.0'
+  s.platform              = :ios, '12.0'
   s.vendored_frameworks   = 'Flutter.xcframework'
 end
 ''';
@@ -423,22 +429,17 @@ end
     Directory simulatorBuildOutput,
   ) async {
     const String appFrameworkName = 'App.framework';
-
     final Status status = globals.logger.startProgress(
       ' ├─Building App.xcframework...',
     );
-    final List<EnvironmentType> environmentTypes = <EnvironmentType>[
-      EnvironmentType.physical,
-      EnvironmentType.simulator,
-    ];
     final List<Directory> frameworks = <Directory>[];
 
     try {
-      for (final EnvironmentType sdkType in environmentTypes) {
-        final Directory outputBuildDirectory =
-            sdkType == EnvironmentType.physical
-                ? iPhoneBuildOutput
-                : simulatorBuildOutput;
+      for (final EnvironmentType sdkType in EnvironmentType.values) {
+        final Directory outputBuildDirectory = switch (sdkType) {
+          EnvironmentType.physical  => iPhoneBuildOutput,
+          EnvironmentType.simulator => simulatorBuildOutput,
+        };
         frameworks.add(outputBuildDirectory.childDirectory(appFrameworkName));
         final Environment environment = Environment(
           projectDir: globals.fs.currentDirectory,
@@ -461,6 +462,7 @@ end
           processManager: globals.processManager,
           platform: globals.platform,
           usage: globals.flutterUsage,
+          analytics: globals.analytics,
           engineVersion: globals.artifacts!.isLocalEngine
               ? null
               : globals.flutterVersion.engineRevision,

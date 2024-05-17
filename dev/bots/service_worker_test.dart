@@ -109,28 +109,17 @@ Future<void> _setAppVersion(int version) async {
 }
 
 String _testTypeToIndexFile(ServiceWorkerTestType type) {
-  late String indexFile;
-  switch (type) {
-    case ServiceWorkerTestType.blockedServiceWorkers:
-      indexFile = 'index_with_blocked_service_workers.html';
-    case ServiceWorkerTestType.withFlutterJs:
-      indexFile = 'index_with_flutterjs.html';
-    case ServiceWorkerTestType.withoutFlutterJs:
-      indexFile = 'index_without_flutterjs.html';
-    case ServiceWorkerTestType.withFlutterJsShort:
-      indexFile = 'index_with_flutterjs_short.html';
-    case ServiceWorkerTestType.withFlutterJsEntrypointLoadedEvent:
-      indexFile = 'index_with_flutterjs_entrypoint_loaded.html';
-    case ServiceWorkerTestType.withFlutterJsTrustedTypesOn:
-      indexFile = 'index_with_flutterjs_el_tt_on.html';
-    case ServiceWorkerTestType.withFlutterJsNonceOn:
-      indexFile = 'index_with_flutterjs_el_nonce.html';
-    case ServiceWorkerTestType.withFlutterJsCustomServiceWorkerVersion:
-      indexFile = 'index_with_flutterjs_custom_sw_version.html';
-    case ServiceWorkerTestType.generatedEntrypoint:
-      indexFile = 'generated_entrypoint.html';
-  }
-  return indexFile;
+  return switch (type) {
+    ServiceWorkerTestType.blockedServiceWorkers                   => 'index_with_blocked_service_workers.html',
+    ServiceWorkerTestType.withFlutterJs                           => 'index_with_flutterjs.html',
+    ServiceWorkerTestType.withoutFlutterJs                        => 'index_without_flutterjs.html',
+    ServiceWorkerTestType.withFlutterJsShort                      => 'index_with_flutterjs_short.html',
+    ServiceWorkerTestType.withFlutterJsEntrypointLoadedEvent      => 'index_with_flutterjs_entrypoint_loaded.html',
+    ServiceWorkerTestType.withFlutterJsTrustedTypesOn             => 'index_with_flutterjs_el_tt_on.html',
+    ServiceWorkerTestType.withFlutterJsNonceOn                    => 'index_with_flutterjs_el_nonce.html',
+    ServiceWorkerTestType.withFlutterJsCustomServiceWorkerVersion => 'index_with_flutterjs_custom_sw_version.html',
+    ServiceWorkerTestType.generatedEntrypoint                     => 'generated_entrypoint.html',
+  };
 }
 
 Future<void> _rebuildApp({ required int version, required ServiceWorkerTestType testType, required String target }) async {
@@ -174,7 +163,11 @@ Future<void> _waitForAppToLoad(
   print('Waiting for app to load $waitForCounts');
   await Future.any(<Future<Object?>>[
     () async {
+      int tries = 1;
       while (!waitForCounts.entries.every((MapEntry<String, int> entry) => (requestedPathCounts[entry.key] ?? 0) >= entry.value)) {
+        if (tries++ % 20 == 0) {
+          print('Still waiting. Requested so far: $requestedPathCounts');
+        }
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     }(),
@@ -315,15 +308,16 @@ Future<void> runWebServiceWorkerTest({
         'flutter.js': 1,
       'main.dart.js': 1,
       'flutter_service_worker.js': 1,
+      'flutter_bootstrap.js': 1,
       'assets/FontManifest.json': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
       'CLOSE': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
     expect(reportedVersion, '1');
@@ -357,12 +351,13 @@ Future<void> runWebServiceWorkerTest({
       if (shouldExpectFlutterJs)
         'flutter.js': 1,
       'flutter_service_worker.js': 2,
+      'flutter_bootstrap.js': 1,
       'main.dart.js': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/FontManifest.json': 1,
       'CLOSE': 1,
       if (!headless)
-        'favicon.ico': 1,
+        'favicon.png': 1,
     });
 
     expect(reportedVersion, '2');
@@ -388,14 +383,15 @@ Future<void> runWebServiceWorkerTest({
       'main.dart.js': 1,
       'assets/FontManifest.json': 1,
       'flutter_service_worker.js': 1,
+      'flutter_bootstrap.js': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
       'CLOSE': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
 
@@ -440,6 +436,7 @@ Future<void> runWebServiceWorkerTest({
       if (shouldExpectFlutterJs)
         'flutter.js': 1,
       'flutter_service_worker.js': 2,
+      'flutter_bootstrap.js': 1,
       'main.dart.js': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/FontManifest.json': 1,
@@ -447,7 +444,7 @@ Future<void> runWebServiceWorkerTest({
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
 
@@ -519,8 +516,8 @@ Future<void> runWebServiceWorkerTestWithCachingResources({
     workingDirectory: _testAppWebDirectory,
   );
 
-  final bool shouldExpectFlutterJs = testType != ServiceWorkerTestType.withoutFlutterJs;
-
+  final bool usesFlutterBootstrapJs = testType == ServiceWorkerTestType.generatedEntrypoint;
+  final bool shouldExpectFlutterJs = !usesFlutterBootstrapJs && testType != ServiceWorkerTestType.withoutFlutterJs;
   print('BEGIN runWebServiceWorkerTestWithCachingResources(headless: $headless, testType: $testType)');
 
   try {
@@ -545,14 +542,15 @@ Future<void> runWebServiceWorkerTestWithCachingResources({
         'flutter.js': 1,
       'main.dart.js': 1,
       'flutter_service_worker.js': 1,
+      'flutter_bootstrap.js': usesFlutterBootstrapJs ? 2 : 1,
       'assets/FontManifest.json': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
 
@@ -604,13 +602,14 @@ Future<void> runWebServiceWorkerTestWithCachingResources({
         'flutter.js': 1,
       'main.dart.js': 1,
       'flutter_service_worker.js': 2,
+      'flutter_bootstrap.js': usesFlutterBootstrapJs ? 2 : 1,
       'assets/FontManifest.json': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
   } finally {
@@ -693,11 +692,11 @@ Future<void> runWebServiceWorkerTestWithBlockedServiceWorkers({
       'assets/FontManifest.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
       'CLOSE': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
   } finally {
@@ -781,14 +780,15 @@ Future<void> runWebServiceWorkerTestWithCustomServiceWorkerVersion({
       'main.dart.js': 1,
       'CLOSE': 1,
       'flutter_service_worker.js': 1,
+      'flutter_bootstrap.js': 1,
       'assets/FontManifest.json': 1,
       'assets/AssetManifest.bin.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
 
@@ -805,11 +805,11 @@ Future<void> runWebServiceWorkerTestWithCustomServiceWorkerVersion({
       'assets/FontManifest.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
       'CLOSE': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
 
@@ -827,11 +827,11 @@ Future<void> runWebServiceWorkerTestWithCustomServiceWorkerVersion({
       'assets/FontManifest.json': 1,
       'assets/fonts/MaterialIcons-Regular.otf': 1,
       'CLOSE': 1,
-      // In headless mode Chrome does not load 'manifest.json' and 'favicon.ico'.
+      // In headless mode Chrome does not load 'manifest.json' and 'favicon.png'.
       if (!headless)
         ...<String, int>{
           'manifest.json': 1,
-          'favicon.ico': 1,
+          'favicon.png': 1,
         },
     });
   } finally {

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -9,7 +10,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 import '../widgets/semantics_tester.dart';
 
@@ -888,7 +888,7 @@ void main() {
     await tester.pumpAndSettle();
     TextField textField = tester.widget(find.byType(TextField));
     expect(textField.textCapitalization, TextCapitalization.characters);
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pump();
 
     await tester.pumpWidget(buildSearchAnchor(TextCapitalization.none));
@@ -899,10 +899,7 @@ void main() {
     expect(textField.textCapitalization, TextCapitalization.none);
   });
 
-  testWidgets('SearchAnchor respects viewOnChanged and viewOnSubmitted properties',
-  // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
-  experimentalLeakTesting: LeakTesting.settings.withTracked(classes: const <String>['CurvedAnimation']),
-  (WidgetTester tester) async {
+  testWidgets('SearchAnchor respects viewOnChanged and viewOnSubmitted properties', (WidgetTester tester) async {
     final SearchController controller = SearchController();
     addTearDown(controller.dispose);
     int onChangedCalled = 0;
@@ -984,7 +981,7 @@ void main() {
     final TextField textFieldInView = tester.widget<TextField>(textFieldFinder);
     expect(textFieldInView.textCapitalization, TextCapitalization.characters);
     // Close search view.
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pumpAndSettle();
     final TextField textField = tester.widget(find.byType(TextField));
     expect(textField.textCapitalization, TextCapitalization.characters);
@@ -1142,7 +1139,7 @@ void main() {
     expect(decoration.border!.bottom.color, colorScheme.outline);
 
     // Default search view has a leading back button on the start of the header.
-    expect(find.widgetWithIcon(IconButton, Icons.arrow_back), findsOneWidget);
+    expect(find.backButton(), findsOneWidget);
 
     final Text helperText = tester.widget(find.text('hint text'));
     expect(helperText.style?.color, colorScheme.onSurfaceVariant);
@@ -1411,13 +1408,13 @@ void main() {
     await tester.tap(find.widgetWithIcon(IconButton, Icons.search));
     await tester.pumpAndSettle();
     // Default is a icon button with arrow_back.
-    expect(find.widgetWithIcon(IconButton, Icons.arrow_back), findsOneWidget);
+    expect(find.backButton(), findsOneWidget);
 
     await tester.pumpWidget(Container());
     await tester.pumpWidget(buildAnchor(viewLeading: const Icon(Icons.history)));
     await tester.tap(find.widgetWithIcon(IconButton, Icons.search));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.backButton(), findsNothing);
     expect(find.byIcon(Icons.history), findsOneWidget);
   });
 
@@ -2192,13 +2189,13 @@ void main() {
     // Open the search view
     await tester.tap(find.byIcon(Icons.search));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.backButton(), findsOneWidget);
 
     // Change window size
     tester.view.physicalSize = const Size(250.0, 200.0);
     tester.view.devicePixelRatio = 1.0;
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.backButton(), findsNothing);
   });
 
   testWidgets('Full-screen search view route should stay if the window size changes', (WidgetTester tester) async {
@@ -2233,13 +2230,13 @@ void main() {
     // Open a full-screen search view
     await tester.tap(find.byIcon(Icons.search));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.backButton(), findsOneWidget);
 
     // Change window size
     tester.view.physicalSize = const Size(250.0, 200.0);
     tester.view.devicePixelRatio = 1.0;
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.backButton(), findsOneWidget);
   });
 
   testWidgets('Search view route does not throw exception during pop animation', (WidgetTester tester) async {
@@ -2278,7 +2275,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Pop search view route
-    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pumpAndSettle();
 
     // No exception.
@@ -2818,7 +2815,7 @@ void main() {
     await tester.pumpAndSettle();
     TextField textField = tester.widget(find.byType(TextField));
     expect(textField.keyboardType, TextInputType.number);
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pump();
 
     await tester.pumpWidget(buildSearchAnchor(TextInputType.phone));
@@ -2852,7 +2849,7 @@ void main() {
     final TextField textFieldInView = tester.widget<TextField>(textFieldFinder);
     expect(textFieldInView.keyboardType, TextInputType.number);
     // Close search view.
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pumpAndSettle();
     final TextField textField = tester.widget(find.byType(TextField));
     expect(textField.keyboardType, TextInputType.number);
@@ -2910,7 +2907,7 @@ void main() {
     await tester.pumpAndSettle();
     TextField textField = tester.widget(find.byType(TextField));
     expect(textField.textInputAction, TextInputAction.previous);
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pump();
 
     await tester.pumpWidget(buildSearchAnchor(TextInputAction.send));
@@ -2944,7 +2941,7 @@ void main() {
     final TextField textFieldInView = tester.widget<TextField>(textFieldFinder);
     expect(textFieldInView.textInputAction, TextInputAction.previous);
     // Close search view.
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.arrow_back));
+    await tester.tap(find.backButton());
     await tester.pumpAndSettle();
     final TextField textField = tester.widget(find.byType(TextField));
     expect(textField.textInputAction, TextInputAction.previous);
@@ -3232,6 +3229,87 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(suggestionsBuilderCalledCount, 2);
+  });
+
+  testWidgets('Suggestions gets refreshed after long API call', (WidgetTester tester) async {
+    Timer? debounceTimer;
+    const Duration apiCallDuration = Duration(seconds: 1);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: SearchAnchor(
+            builder: (BuildContext context, SearchController controller) {
+              return const Icon(Icons.search);
+            },
+            suggestionsBuilder: (BuildContext context, SearchController controller) async {
+              final Completer<List<String>> completer = Completer<List<String>>();
+              debounceTimer?.cancel();
+              debounceTimer = Timer(apiCallDuration, () {
+                completer.complete(List<String>.generate(10, (int index) => 'Item - $index'));
+              });
+              final List<String> options = await completer.future;
+
+              final List<Widget> suggestions = List<Widget>.generate(options.length, (int index) {
+                final String item = options[index];
+                return ListTile(
+                  title: Text(item),
+                );
+              });
+              return suggestions;
+            },
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.byIcon(Icons.search)); // Open search view.
+    await tester.pumpAndSettle();
+
+    // Simulate the keyboard opening resizing the view.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 500.0);
+    addTearDown(tester.view.reset);
+
+    // Show the keyboard.
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.pumpAndSettle(apiCallDuration);
+
+    expect(find.text('Item - 1'), findsOneWidget);
+  });
+
+  testWidgets('SearchBar.scrollPadding is passed through to EditableText', (WidgetTester tester) async {
+    const EdgeInsets scrollPadding = EdgeInsets.zero;
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Material(
+          child: SearchBar(
+            scrollPadding: scrollPadding,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(EditableText), findsOneWidget);
+    final EditableText editableText = tester.widget(find.byType(EditableText));
+    expect(editableText.scrollPadding, scrollPadding);
+  });
+
+  testWidgets('SearchAnchor.bar.scrollPadding is passed through to EditableText', (WidgetTester tester) async {
+    const EdgeInsets scrollPadding = EdgeInsets.zero;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SearchAnchor.bar(
+            suggestionsBuilder: (BuildContext context, SearchController controller) {
+              return <Widget>[];
+            },
+            scrollPadding: scrollPadding,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(EditableText), findsOneWidget);
+    final EditableText editableText = tester.widget(find.byType(EditableText));
+    expect(editableText.scrollPadding, scrollPadding);
   });
 }
 

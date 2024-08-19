@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'use_cases.dart';
 
 class TextFieldPasswordUseCase extends UseCase {
-
   @override
   String get name => 'TextField password';
 
@@ -26,7 +25,7 @@ class _MainWidget extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('TextField password'),
+        title: Semantics(headingLevel: 1, child: const Text('TextField password demo')),
       ),
       body: ListView(
         children: const <Widget>[
@@ -34,7 +33,6 @@ class _MainWidget extends StatelessWidget {
             key: Key('enabled password'),
             decoration: InputDecoration(
               labelText: 'Password',
-              hintText: 'Enter your password',
             ),
             obscureText: true,
           ),
@@ -42,7 +40,6 @@ class _MainWidget extends StatelessWidget {
             key: Key('disabled password'),
             decoration: InputDecoration(
               labelText: 'Password',
-              hintText: 'Enter your password',
             ),
             enabled: false,
             obscureText: true,

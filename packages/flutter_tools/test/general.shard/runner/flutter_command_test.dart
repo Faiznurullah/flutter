@@ -643,7 +643,7 @@ void main() {
     testUsingContext('use packagesPath to generate BuildInfo', () async {
       final DummyFlutterCommand flutterCommand = DummyFlutterCommand(packagesPath: 'foo');
       final BuildInfo buildInfo = await flutterCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
-      expect(buildInfo.packagesPath, 'foo');
+      expect(buildInfo.packageConfigPath, 'foo');
     }, overrides: <Type, Generator>{
       FileSystem: () => fileSystem,
       ProcessManager: () => processManager,
@@ -695,6 +695,18 @@ void main() {
       await runner.run(<String>['dummy', '--no-assume-initialize-from-dill-up-to-date']);
       final BuildInfo buildInfo = await flutterCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
       expect(buildInfo.assumeInitializeFromDillUpToDate, isFalse);
+    }, overrides: <Type, Generator>{
+      FileSystem: () => fileSystem,
+      ProcessManager: () => processManager,
+    });
+
+    testUsingContext('sets useLocalCanvasKit in BuildInfo', () async {
+      final DummyFlutterCommand flutterCommand = DummyFlutterCommand();
+      final CommandRunner<void> runner = createTestCommandRunner(flutterCommand);
+      fileSystem.directory('engine/src/out/wasm_release').createSync(recursive: true);
+      await runner.run(<String>['--local-web-sdk=wasm_release', '--local-engine-src-path=engine/src', 'dummy']);
+      final BuildInfo buildInfo = await flutterCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
+      expect(buildInfo.useLocalCanvasKit, isTrue);
     }, overrides: <Type, Generator>{
       FileSystem: () => fileSystem,
       ProcessManager: () => processManager,
@@ -1216,6 +1228,45 @@ void main() {
         Cache: () => Cache.test(processManager: FakeProcessManager.any()),
         FileSystem: () => fileSystem,
         ProcessManager: () => FakeProcessManager.any(),
+      });
+
+      testUsingContext('CLI option overrides default flavor from manifest', () async {
+        final File pubspec = fileSystem.file('pubspec.yaml');
+        await pubspec.create();
+        await pubspec.writeAsString('''
+name: test
+flutter:
+  default-flavor: foo
+        ''');
+
+        final DummyFlutterCommand flutterCommand = DummyFlutterCommand();
+        final BuildInfo buildInfo = await flutterCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
+        expect(buildInfo.flavor, 'foo');
+      }, overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.empty(),
+      });
+
+      testUsingContext('tool loads default flavor from manifest, but cli overrides', () async {
+        final File pubspec = fileSystem.file('pubspec.yaml');
+        await pubspec.create();
+        await pubspec.writeAsString('''
+name: test
+flutter:
+  default-flavor: foo
+        ''');
+
+        final DummyFlutterCommand flutterCommand = DummyFlutterCommand(commandFunction: () async {
+          return FlutterCommandResult.success();
+        },);
+        flutterCommand.usesFlavorOption();
+        final CommandRunner<void> runner =  createTestCommandRunner(flutterCommand);
+        await runner.run(<String>['dummy', '--flavor', 'bar']);
+        final BuildInfo buildInfo = await flutterCommand.getBuildInfo(forcedBuildMode: BuildMode.debug);
+        expect(buildInfo.flavor, 'bar');
+      }, overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.empty(),
       });
     });
   });

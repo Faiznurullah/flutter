@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'color_scheme.dart';
+/// @docImport 'scaffold.dart';
+/// @docImport 'selection_area.dart';
+/// @docImport 'text_field.dart';
+library;
+
 import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/cupertino.dart';
@@ -11,7 +17,6 @@ import 'package:flutter/rendering.dart';
 
 import 'adaptive_text_selection_toolbar.dart';
 import 'desktop_text_selection.dart';
-import 'feedback.dart';
 import 'magnifier.dart';
 import 'text_selection.dart';
 import 'theme.dart';

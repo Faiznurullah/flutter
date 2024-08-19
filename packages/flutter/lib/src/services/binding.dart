@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'dart:ui';
+///
+/// @docImport 'package:flutter/widgets.dart';
+///
+/// @docImport 'system_chrome.dart';
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -47,6 +54,7 @@ mixin ServicesBinding on BindingBase, SchedulerBinding {
     SystemChannels.accessibility.setMessageHandler((dynamic message) => _handleAccessibilityMessage(message as Object));
     SystemChannels.lifecycle.setMessageHandler(_handleLifecycleMessage);
     SystemChannels.platform.setMethodCallHandler(_handlePlatformMessage);
+    platformDispatcher.onViewFocusChange = handleViewFocusChanged;
     TextInput.ensureInitialized();
     readInitialLifecycleStateFromNativeWindow();
     initializationComplete();
@@ -355,6 +363,19 @@ mixin ServicesBinding on BindingBase, SchedulerBinding {
     return;
   }
 
+  /// Called whenever the [PlatformDispatcher] receives a notification that the
+  /// focus state on a view has changed.
+  ///
+  /// The [event] contains the view ID for the view that changed its focus
+  /// state.
+  ///
+  /// See also:
+  ///
+  /// * [PlatformDispatcher.onViewFocusChange], which calls this method.
+  @protected
+  @mustCallSuper
+  void handleViewFocusChanged(ui.ViewFocusEvent event) {}
+
   Future<dynamic> _handlePlatformMessage(MethodCall methodCall) async {
     final String method = methodCall.method;
     switch (method) {
@@ -552,11 +573,11 @@ class _DefaultBinaryMessenger extends BinaryMessenger {
     ByteData? message,
     ui.PlatformMessageResponseCallback? callback,
   ) async {
-    ui.channelBuffers.push(channel, message, (ByteData? data) {
-      if (callback != null) {
-        callback(data);
-      }
-    });
+    ui.channelBuffers.push(
+      channel,
+      message,
+      (ByteData? data) => callback?.call(data),
+    );
   }
 
   @override

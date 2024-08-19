@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'date_picker.dart';
+/// @docImport 'text_field.dart';
+library;
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -17,7 +21,6 @@ import 'colors.dart';
 import 'curves.dart';
 import 'debug.dart';
 import 'dialog.dart';
-import 'feedback.dart';
 import 'icon_button.dart';
 import 'icons.dart';
 import 'ink_well.dart';
@@ -547,7 +550,7 @@ class _DayPeriodControl extends StatelessWidget {
     final int newHour = (selectedTime.hour + TimeOfDay.hoursPerPeriod) % TimeOfDay.hoursPerDay;
     final TimeOfDay newTime = selectedTime.replacing(hour: newHour);
     if (onPeriodChanged != null) {
-      onPeriodChanged!.call(newTime);
+      onPeriodChanged!(newTime);
     } else {
       _TimePickerModel.setSelectedTime(context, newTime);
     }

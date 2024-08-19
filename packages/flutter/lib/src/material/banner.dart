@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'dart:ui';
+///
+/// @docImport 'text_button.dart';
+library;
+
 import 'package:flutter/widgets.dart';
 
 import 'banner_theme.dart';
@@ -312,17 +317,12 @@ class _MaterialBannerState extends State<MaterialBanner> {
     super.dispose();
   }
 
-  void _onAnimationStatusChanged(AnimationStatus animationStatus) {
-    switch (animationStatus) {
-      case AnimationStatus.dismissed:
-      case AnimationStatus.forward:
-      case AnimationStatus.reverse:
-        break;
-      case AnimationStatus.completed:
-        if (widget.onVisible != null && !_wasVisible) {
-          widget.onVisible!();
-        }
-        _wasVisible = true;
+  void _onAnimationStatusChanged(AnimationStatus status) {
+    if (status.isCompleted) {
+      if (widget.onVisible != null && !_wasVisible) {
+        widget.onVisible!();
+      }
+      _wasVisible = true;
     }
   }
 

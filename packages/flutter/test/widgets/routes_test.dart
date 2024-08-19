@@ -8,7 +8,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 import 'semantics_tester.dart';
 
@@ -975,10 +974,7 @@ void main() {
       expect(secondaryAnimationOfRouteOne.value, primaryAnimationOfRouteTwo.value);
     });
 
-    testWidgets('showGeneralDialog handles transparent barrier color',
-    // TODO(polina-c): remove when fixed https://github.com/flutter/flutter/issues/145600 [leak-tracking-opt-in]
-    experimentalLeakTesting: LeakTesting.settings.withTracked(classes: <String>['CurvedAnimation']),
-    (WidgetTester tester) async {
+    testWidgets('showGeneralDialog handles transparent barrier color', (WidgetTester tester) async {
       await tester.pumpWidget(MaterialApp(
         home: Builder(
           builder: (BuildContext context) {
@@ -1975,6 +1971,78 @@ void main() {
     await tester.restoreFrom(restorationData);
     expect(find.byType(AlertDialog), findsOneWidget);
   }, skip: isBrowser); // https://github.com/flutter/flutter/issues/33615
+
+  group('NavigationNotifications', () {
+    testWidgets('with no WillPopScope', (WidgetTester tester) async {
+      final List<NavigationNotification> notifications = <NavigationNotification>[];
+      await tester.pumpWidget(
+        NotificationListener<NavigationNotification>(
+          onNotification: (NavigationNotification notification) {
+            notifications.add(notification);
+            return true;
+          },
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Navigator(
+              initialRoute: '/',
+              onGenerateRoute: (RouteSettings settings) {
+                return MaterialPageRoute<void>(
+                  builder: (BuildContext context) {
+                    return const SizedBox.shrink();
+                  },
+                  settings: settings,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Only one notification, from the initial route, where a pop can't be
+      // handled because there's no other route to pop.
+      expect(notifications, hasLength(1));
+      expect(notifications.first.canHandlePop, isFalse);
+    });
+
+    testWidgets('with WillPopScope', (WidgetTester tester) async {
+      final List<NavigationNotification> notifications = <NavigationNotification>[];
+      await tester.pumpWidget(
+        NotificationListener<NavigationNotification>(
+          onNotification: (NavigationNotification notification) {
+            notifications.add(notification);
+            return true;
+          },
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Navigator(
+              initialRoute: '/',
+              onGenerateRoute: (RouteSettings settings) {
+                return MaterialPageRoute<void>(
+                  builder: (BuildContext context) {
+                    return WillPopScope(
+                      onWillPop: () {
+                        return Future<bool>.value(false);
+                      },
+                      child: const SizedBox.shrink(),
+                    );
+                  },
+                  settings: settings,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Two notifications. The first is from the initial route, where a pop
+      // can't be handled because it's the only route. The second is from
+      // registering the WillPopScope, where it will always want to receive
+      // pops.
+      expect(notifications, hasLength(2));
+      expect(notifications.first.canHandlePop, isFalse);
+      expect(notifications.last.canHandlePop, isTrue);
+    });
+  });
 }
 
 double _getOpacity(GlobalKey key, WidgetTester tester) {

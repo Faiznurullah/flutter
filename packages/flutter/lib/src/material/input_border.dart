@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'input_decorator.dart';
+library;
+
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
@@ -539,15 +542,12 @@ class OutlineInputBorder extends InputBorder {
       canvas.drawRRect(center, paint);
     } else {
       final double extent = lerpDouble(0.0, gapExtent + gapPadding * 2.0, gapPercentage)!;
-      switch (textDirection!) {
-        case TextDirection.rtl:
-          final Path path = _gapBorderPath(canvas, center, math.max(0.0, gapStart + gapPadding - extent), extent);
-          canvas.drawPath(path, paint);
-
-        case TextDirection.ltr:
-          final Path path = _gapBorderPath(canvas, center, math.max(0.0, gapStart - gapPadding), extent);
-          canvas.drawPath(path, paint);
-      }
+      final double start = switch (textDirection!) {
+        TextDirection.rtl => gapStart + gapPadding - extent,
+        TextDirection.ltr => gapStart - gapPadding,
+      };
+      final Path path = _gapBorderPath(canvas, center, math.max(0.0, start), extent);
+      canvas.drawPath(path, paint);
     }
   }
 

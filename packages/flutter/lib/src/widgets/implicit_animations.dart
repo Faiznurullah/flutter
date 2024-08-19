@@ -2,6 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'animated_cross_fade.dart';
+/// @docImport 'animated_size.dart';
+/// @docImport 'animated_switcher.dart';
+/// @docImport 'scroll_view.dart';
+/// @docImport 'sliver.dart';
+/// @docImport 'tween_animation_builder.dart';
+library;
+
 import 'dart:ui' as ui show TextHeightBehavior;
 
 import 'package:flutter/foundation.dart';
@@ -363,12 +373,8 @@ abstract class ImplicitlyAnimatedWidgetState<T extends ImplicitlyAnimatedWidget>
   void initState() {
     super.initState();
     _controller.addStatusListener((AnimationStatus status) {
-      switch (status) {
-        case AnimationStatus.completed:
-          widget.onEnd?.call();
-        case AnimationStatus.dismissed:
-        case AnimationStatus.forward:
-        case AnimationStatus.reverse:
+      if (status.isCompleted) {
+        widget.onEnd?.call();
       }
     });
     _constructTweens();
